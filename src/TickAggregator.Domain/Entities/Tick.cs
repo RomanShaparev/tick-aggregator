@@ -1,0 +1,12 @@
+namespace TickAggregator.Domain.Entities;
+
+public sealed class Tick
+{
+    public string TradeId { get; init; } = default!;
+    public string Exchange { get; init; } = default!;
+    public string Ticker { get; init; } = default!;
+    public decimal Price { get; init; }
+    public decimal Volume { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public DateTimeOffset ReceivedAt { get; init; }
+}
