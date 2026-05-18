@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace TickAggregator.Simulator.Exchanges;
 
@@ -6,7 +7,8 @@ public sealed class BinanceSimulatorService : ExchangeSimulatorService
 {
     private long _tradeId = 10000000;
 
-    public BinanceSimulatorService(ILogger<BinanceSimulatorService> logger) : base(logger) { }
+    public BinanceSimulatorService(ILogger<BinanceSimulatorService> logger, IConfiguration configuration)
+        : base(logger, configuration) { }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.CompletedTask;
 
@@ -27,14 +29,14 @@ public sealed class BinanceSimulatorService : ExchangeSimulatorService
         var volume = Math.Round((decimal)(Rng.NextDouble() * 2 + 0.001), 6);
         var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        return JsonSerializer.Serialize(new
+        return new JsonObject
         {
-            e = "trade",
-            t = id,
-            s = Symbols[idx],
-            p = price.ToString("F2"),
-            q = volume.ToString("F6"),
-            T = ts
-        });
+            ["e"] = "trade",
+            ["t"] = id,
+            ["s"] = Symbols[idx],
+            ["p"] = price.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+            ["q"] = volume.ToString("F6", System.Globalization.CultureInfo.InvariantCulture),
+            ["T"] = ts
+        }.ToJsonString();
     }
 }

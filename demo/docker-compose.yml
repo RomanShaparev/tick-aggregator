@@ -1,0 +1,76 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tickaggregator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  simulator-binance:
+    build:
+      context: ../
+      dockerfile: src/TickAggregator.Simulator/Dockerfile
+    environment:
+      Simulator__Exchange: Binance
+      Simulator__TickIntervalMinMs: 10
+      Simulator__TickIntervalMaxMs: 50
+
+  simulator-kraken:
+    build:
+      context: ../
+      dockerfile: src/TickAggregator.Simulator/Dockerfile
+    environment:
+      Simulator__Exchange: Kraken
+      Simulator__TickIntervalMinMs: 20
+      Simulator__TickIntervalMaxMs: 80
+
+  simulator-bybit:
+    build:
+      context: ../
+      dockerfile: src/TickAggregator.Simulator/Dockerfile
+    environment:
+      Simulator__Exchange: Bybit
+      Simulator__TickIntervalMinMs: 15
+      Simulator__TickIntervalMaxMs: 60
+
+  worker:
+    build:
+      context: ../
+      dockerfile: src/TickAggregator.Worker/Dockerfile
+    environment:
+      RabbitMq__Host: rabbitmq
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=tickaggregator;Username=postgres;Password=postgres"
+      DataSources__0__Name: Binance
+      DataSources__0__Url: ws://simulator-binance:5100/ws/binance
+      DataSources__1__Name: Kraken
+      DataSources__1__Url: ws://simulator-kraken:5100/ws/kraken
+      DataSources__2__Name: Bybit
+      DataSources__2__Url: ws://simulator-bybit:5100/ws/bybit
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      simulator-binance:
+        condition: service_started
+      simulator-bybit:
+        condition: service_started
+      simulator-kraken:
+        condition: service_started

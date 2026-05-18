@@ -7,7 +7,6 @@ using TickAggregator.Domain.Entities;
 using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
 using TickAggregator.EndToEndTests.Infrastructure;
-using TickAggregator.Infrastructure.Database;
 using TickAggregator.Worker;
 using Xunit;
 
@@ -19,20 +18,19 @@ public sealed class ProgramHostTests : IAsyncLifetime
     private readonly PostgresFixture _postgres = new();
     private readonly string _queueSuffix = Guid.NewGuid().ToString("N");
     private IHost? _host;
-    private CancellationTokenSource? _cts;
 
-    public async Task InitializeAsync() =>
+    public async Task InitializeAsync()
+    {
         await Task.WhenAll(_rabbitMq.InitializeAsync(), _postgres.InitializeAsync());
+    }
 
     public async Task DisposeAsync()
     {
-        _cts?.Cancel();
         if (_host is not null)
         {
             await _host.StopAsync(TimeSpan.FromSeconds(5));
             _host.Dispose();
         }
-        _cts?.Dispose();
         await _postgres.DisposeAsync();
         await _rabbitMq.DisposeAsync();
     }
@@ -69,9 +67,7 @@ public sealed class ProgramHostTests : IAsyncLifetime
     private async Task StartHostAsync(IReadOnlyList<Tick> ticks)
     {
         _host = BuildHost(ticks);
-        _cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        _ = _host.RunAsync(_cts.Token);
-        await Task.Delay(500); // дать хосту время стартовать
+        await _host.StartAsync();
     }
 
     private async Task<int> WaitForCountAsync(int expected, TimeSpan timeout)
@@ -101,7 +97,6 @@ public sealed class ProgramHostTests : IAsyncLifetime
     [Fact]
     public async Task Host_SingleTick_SavedToDatabase()
     {
-        await _postgres.ClearTicksAsync();
         await StartHostAsync([MakeTick("e2e-1")]);
 
         var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(30));
@@ -111,7 +106,6 @@ public sealed class ProgramHostTests : IAsyncLifetime
     [Fact]
     public async Task Host_DuplicateTick_SavedOnlyOnce()
     {
-        await _postgres.ClearTicksAsync();
         var tick = MakeTick("e2e-dup");
         await StartHostAsync([tick, tick]);
 
@@ -122,7 +116,6 @@ public sealed class ProgramHostTests : IAsyncLifetime
     [Fact]
     public async Task Host_MultipleExchanges_AllSaved()
     {
-        await _postgres.ClearTicksAsync();
         await StartHostAsync([
             MakeTick("e2e-bin", Exchange.Binance),
             MakeTick("e2e-kra", Exchange.Kraken),

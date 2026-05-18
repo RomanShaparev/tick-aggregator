@@ -7,11 +7,18 @@ public abstract class ExchangeSimulatorService : BackgroundService
 {
     protected readonly ILogger Logger;
     protected static readonly Random Rng = new();
+    private readonly int _tickIntervalMinMs;
+    private readonly int _tickIntervalMaxMs;
 
     protected static readonly string[] Symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
     protected static readonly decimal[] BasePrices = [50000m, 3000m, 150m, 400m, 0.6m];
 
-    protected ExchangeSimulatorService(ILogger logger) => Logger = logger;
+    protected ExchangeSimulatorService(ILogger logger, IConfiguration configuration)
+    {
+        Logger = logger;
+        _tickIntervalMinMs = configuration.GetValue("Simulator:TickIntervalMinMs", 10);
+        _tickIntervalMaxMs = configuration.GetValue("Simulator:TickIntervalMaxMs", 50);
+    }
 
     protected async Task SendTicksAsync(
         System.Net.WebSockets.WebSocket ws,
@@ -25,7 +32,7 @@ public abstract class ExchangeSimulatorService : BackgroundService
                 var message = messageFactory();
                 var bytes = Encoding.UTF8.GetBytes(message);
                 await ws.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
-                await Task.Delay(Rng.Next(10, 50), ct); // 20-100 тиков/сек
+                await Task.Delay(Rng.Next(_tickIntervalMinMs, _tickIntervalMaxMs), ct);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)

@@ -1,10 +1,11 @@
-using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace TickAggregator.Simulator.Exchanges;
 
 public sealed class BybitSimulatorService : ExchangeSimulatorService
 {
-    public BybitSimulatorService(ILogger<BybitSimulatorService> logger) : base(logger) { }
+    public BybitSimulatorService(ILogger<BybitSimulatorService> logger, IConfiguration configuration)
+        : base(logger, configuration) { }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.CompletedTask;
 
@@ -27,22 +28,19 @@ public sealed class BybitSimulatorService : ExchangeSimulatorService
         var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var side = Rng.Next(2) == 0 ? "Buy" : "Sell";
 
-        return JsonSerializer.Serialize(new
+        return new JsonObject
         {
-            topic = $"publicTrade.{symbol}",
-            ts,
-            data = new[]
+            ["topic"] = $"publicTrade.{symbol}",
+            ["ts"] = ts,
+            ["data"] = new JsonArray(new JsonObject
             {
-                new
-                {
-                    i = tradeId,
-                    T = ts,
-                    p = price.ToString("F2"),
-                    v = volume.ToString("F6"),
-                    S = side,
-                    s = symbol
-                }
-            }
-        });
+                ["i"] = tradeId,
+                ["T"] = ts,
+                ["p"] = price.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                ["v"] = volume.ToString("F6", System.Globalization.CultureInfo.InvariantCulture),
+                ["S"] = side,
+                ["s"] = symbol
+            })
+        }.ToJsonString();
     }
 }

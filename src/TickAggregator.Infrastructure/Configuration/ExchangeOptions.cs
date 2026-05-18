@@ -9,7 +9,7 @@ public sealed class DataSourceConfig
     [Required]
     public required string Name { get; init; }
 
-    [Required, Url]
+    [Required]
     public required string Url { get; init; }
 
     [Range(0, int.MaxValue)]

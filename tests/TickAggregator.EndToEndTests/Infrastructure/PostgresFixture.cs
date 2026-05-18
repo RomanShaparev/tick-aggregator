@@ -35,10 +35,4 @@ public sealed class PostgresFixture : IAsyncLifetime
         await using var conn = new NpgsqlConnection(ConnectionString);
         return await conn.QuerySingleAsync<int>("SELECT COUNT(*) FROM ticks");
     }
-
-    public async Task ClearTicksAsync()
-    {
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        await conn.ExecuteAsync("TRUNCATE TABLE ticks");
-    }
 }

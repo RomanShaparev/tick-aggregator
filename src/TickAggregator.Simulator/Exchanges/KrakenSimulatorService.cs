@@ -6,7 +6,8 @@ public sealed class KrakenSimulatorService : ExchangeSimulatorService
 {
     private long _tradeId = 59800000;
 
-    public KrakenSimulatorService(ILogger<KrakenSimulatorService> logger) : base(logger) { }
+    public KrakenSimulatorService(ILogger<KrakenSimulatorService> logger, IConfiguration configuration)
+        : base(logger, configuration) { }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.CompletedTask;
 
