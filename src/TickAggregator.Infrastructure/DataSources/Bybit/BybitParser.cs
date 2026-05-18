@@ -4,9 +4,18 @@ namespace TickAggregator.Infrastructure.DataSources.Bybit;
 
 public sealed class BybitParser : IParser<BybitTick>
 {
-    public IEnumerable<BybitTick> Parse(string payload)
+    public bool TryParse(string payload, out IEnumerable<BybitTick> items)
     {
-        var message = JsonSerializer.Deserialize<BybitMessage>(payload)!;
-        return message.Data is { Length: > 0 } ? message.Data : [];
+        try
+        {
+            var message = JsonSerializer.Deserialize<BybitMessage>(payload)!;
+            items = message.Data is { Length: > 0 } ? message.Data : [];
+            return true;
+        }
+        catch
+        {
+            items = [];
+            return false;
+        }
     }
 }

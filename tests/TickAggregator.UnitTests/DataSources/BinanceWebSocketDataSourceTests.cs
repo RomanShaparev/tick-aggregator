@@ -3,7 +3,9 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using TickAggregator.Domain.Enums;
+using TickAggregator.Infrastructure.DataSources;
 using TickAggregator.Infrastructure.DataSources.Binance;
+using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Infrastructure.WebSocket;
 using Xunit;
 
@@ -11,8 +13,8 @@ namespace TickAggregator.UnitTests.DataSources;
 
 public sealed class BinanceWebSocketDataSourceTests
 {
-    private static BinanceWebSocketDataSource CreateSource(IExchangeWebSocketClient client)
-        => new(client, new BinanceParser(), new BinanceMapper(), NullLogger<BinanceWebSocketDataSource>.Instance);
+    private static ExchangeWebSocketDataSource<BinanceTick> CreateSource(IExchangeWebSocketClient client)
+        => new(client, new BinanceParser(), new BinanceMapper(), Substitute.For<IDlqProducer>(), Exchange.Binance, NullLogger.Instance);
 
     private static async IAsyncEnumerable<string> Payloads(
         IEnumerable<string> items,
@@ -46,14 +48,18 @@ public sealed class BinanceWebSocketDataSourceTests
     }
 
     [Fact]
-    public async Task InvalidJson_YieldsNothing()
+    public async Task InvalidJson_YieldsNothing_AndSendsToDlq()
     {
+        var dlq = Substitute.For<IDlqProducer>();
         var client = Substitute.For<IExchangeWebSocketClient>();
         client.StreamAsync(Arg.Any<CancellationToken>()).Returns(Payloads(["not-json"]));
+        var source = new ExchangeWebSocketDataSource<BinanceTick>(
+            client, new BinanceParser(), new BinanceMapper(), dlq, Exchange.Binance, NullLogger.Instance);
 
-        var ticks = await CreateSource(client).StreamAsync(default).ToListAsync();
+        var ticks = await source.StreamAsync(default).ToListAsync();
 
         ticks.Should().BeEmpty();
+        await dlq.Received(1).SendAsync(Arg.Is<InvalidMessage>(m => m.Exchange == Exchange.Binance && m.RawPayload == "not-json"), Arg.Any<CancellationToken>());
     }
 
     [Fact]

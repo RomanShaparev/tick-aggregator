@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using TickAggregator.Domain.Entities;
+using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
+using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Infrastructure.WebSocket;
 
 namespace TickAggregator.Infrastructure.DataSources;
@@ -11,17 +13,23 @@ public class ExchangeWebSocketDataSource<T> : IExchangeDataSource
     private readonly IExchangeWebSocketClient _client;
     private readonly IParser<T> _parser;
     private readonly IMapper<T> _mapper;
+    private readonly IDlqProducer _dlq;
+    private readonly Exchange _exchange;
     private readonly ILogger _logger;
 
-    protected ExchangeWebSocketDataSource(
+    public ExchangeWebSocketDataSource(
         IExchangeWebSocketClient client,
         IParser<T> parser,
         IMapper<T> mapper,
+        IDlqProducer dlq,
+        Exchange exchange,
         ILogger logger)
     {
         _client = client;
         _parser = parser;
         _mapper = mapper;
+        _dlq = dlq;
+        _exchange = exchange;
         _logger = logger;
     }
 
@@ -29,16 +37,13 @@ public class ExchangeWebSocketDataSource<T> : IExchangeDataSource
     {
         await foreach (var payload in _client.StreamAsync(ct))
         {
-            IEnumerable<T> items;
-            try
+            if (!_parser.TryParse(payload, out var items))
             {
-                items = _parser.Parse(payload);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to parse message");
+                _logger.LogWarning("Failed to parse message from {Exchange}, sending to DLQ", _exchange);
+                await _dlq.SendAsync(new InvalidMessage(_exchange, payload), ct);
                 continue;
             }
+            
             foreach (var raw in items)
                 yield return _mapper.Map(raw);
         }

@@ -15,4 +15,7 @@ public sealed class DataSourceConfig
 
     [Range(0, int.MaxValue)]
     public int MaxReconnectDelayMs { get; init; } = 60000;
+
+    [Range(1, int.MaxValue)]
+    public int MessageBufferSize { get; init; } = 10000;
 }

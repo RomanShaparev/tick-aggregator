@@ -3,7 +3,9 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using TickAggregator.Domain.Enums;
+using TickAggregator.Infrastructure.DataSources;
 using TickAggregator.Infrastructure.DataSources.Kraken;
+using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Infrastructure.WebSocket;
 using Xunit;
 
@@ -11,8 +13,8 @@ namespace TickAggregator.UnitTests.DataSources;
 
 public sealed class KrakenWebSocketDataSourceTests
 {
-    private static KrakenWebSocketDataSource CreateSource(IExchangeWebSocketClient client)
-        => new(client, new KrakenParser(), new KrakenMapper(), NullLogger<KrakenWebSocketDataSource>.Instance);
+    private static ExchangeWebSocketDataSource<KrakenTick> CreateSource(IExchangeWebSocketClient client)
+        => new(client, new KrakenParser(), new KrakenMapper(), Substitute.For<IDlqProducer>(), Exchange.Kraken, NullLogger.Instance);
 
     private static async IAsyncEnumerable<string> Payloads(
         IEnumerable<string> items,

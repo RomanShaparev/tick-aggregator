@@ -9,18 +9,22 @@ namespace TickAggregator.Infrastructure.WebSocket;
 
 public sealed class ExchangeWebSocketClient : IExchangeWebSocketClient
 {
+    private const int ReceiveBufferSize = 16384;
+
     private readonly Uri _uri;
     private readonly ResiliencePipeline _pipeline;
     private readonly ILogger _logger;
-    private const int ReceiveBufferSize = 16384;
+    private readonly int _messageBufferSize;
 
     public ExchangeWebSocketClient(
         Uri uri,
         TimeSpan initialDelay,
         TimeSpan maxDelay,
+        int messageBufferSize,
         ILogger logger)
     {
         _uri = uri;
+        _messageBufferSize = messageBufferSize;
         _logger = logger;
         _pipeline = new ResiliencePipelineBuilder()
             .AddRetry(new RetryStrategyOptions
@@ -43,7 +47,14 @@ public sealed class ExchangeWebSocketClient : IExchangeWebSocketClient
 
     public IAsyncEnumerable<string> StreamAsync(CancellationToken ct)
     {
-        var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+        var channel = Channel.CreateBounded<string>(new BoundedChannelOptions(_messageBufferSize)
+            {
+                SingleReader = true,
+                SingleWriter = true,
+                FullMode = BoundedChannelFullMode.DropWrite
+            },
+            _ => _logger.LogWarning("Message was dropped.")
+        );
         _ = ProduceAsync(channel.Writer, ct);
         return channel.Reader.ReadAllAsync(ct);
     }

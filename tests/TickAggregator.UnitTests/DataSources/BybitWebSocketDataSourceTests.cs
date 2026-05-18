@@ -3,7 +3,9 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using TickAggregator.Domain.Enums;
+using TickAggregator.Infrastructure.DataSources;
 using TickAggregator.Infrastructure.DataSources.Bybit;
+using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Infrastructure.WebSocket;
 using Xunit;
 
@@ -11,8 +13,8 @@ namespace TickAggregator.UnitTests.DataSources;
 
 public sealed class BybitWebSocketDataSourceTests
 {
-    private static BybitWebSocketDataSource CreateSource(IExchangeWebSocketClient client)
-        => new(client, new BybitParser(), new BybitMapper(), NullLogger<BybitWebSocketDataSource>.Instance);
+    private static ExchangeWebSocketDataSource<BybitTick> CreateSource(IExchangeWebSocketClient client)
+        => new(client, new BybitParser(), new BybitMapper(), Substitute.For<IDlqProducer>(), Exchange.Bybit, NullLogger.Instance);
 
     private static async IAsyncEnumerable<string> Payloads(
         IEnumerable<string> items,

@@ -8,12 +8,13 @@ using TickAggregator.Application.Metrics;
 using TickAggregator.Application.Services;
 using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
+using TickAggregator.Infrastructure.Caching;
 using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.Database;
+using TickAggregator.Infrastructure.DataSources;
 using TickAggregator.Infrastructure.DataSources.Binance;
 using TickAggregator.Infrastructure.DataSources.Bybit;
 using TickAggregator.Infrastructure.DataSources.Kraken;
-using TickAggregator.Infrastructure.Caching;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Infrastructure.WebSocket;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<TickProcessingService>();
 
         services.AddSingleton<ITickProducer, TickProducer>();
+        services.AddSingleton<IDlqProducer, DlqProducer>();
         services.AddSingleton<TickCollectorService>();
 
         return services;
@@ -60,30 +62,23 @@ public static class DependencyInjection
 
             var initialDelay = TimeSpan.FromMilliseconds(cfg.ReconnectDelayMs);
             var maxDelay = TimeSpan.FromMilliseconds(cfg.MaxReconnectDelayMs);
+            var messageBufferSize = cfg.MessageBufferSize;
 
             IExchangeDataSource Factory(IServiceProvider sp)
             {
                 var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                var dlq = sp.GetRequiredService<IDlqProducer>();
+                var wsClient = new ExchangeWebSocketClient(uri, initialDelay, maxDelay, messageBufferSize,
+                    loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.{exchange}"));
+                var logger = loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketDataSource<object>)}.{exchange}");
                 return exchange switch
                 {
-                    Exchange.Binance => new BinanceWebSocketDataSource(
-                        new ExchangeWebSocketClient(uri, initialDelay, maxDelay,
-                            loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.Binance")),
-                        new BinanceParser(),
-                        new BinanceMapper(),
-                        loggerFactory.CreateLogger<BinanceWebSocketDataSource>()),
-                    Exchange.Bybit => new BybitWebSocketDataSource(
-                        new ExchangeWebSocketClient(uri, initialDelay, maxDelay,
-                            loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.Bybit")),
-                        new BybitParser(),
-                        new BybitMapper(),
-                        loggerFactory.CreateLogger<BybitWebSocketDataSource>()),
-                    Exchange.Kraken => new KrakenWebSocketDataSource(
-                        new ExchangeWebSocketClient(uri, initialDelay, maxDelay,
-                            loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.Kraken")),
-                        new KrakenParser(),
-                        new KrakenMapper(),
-                        loggerFactory.CreateLogger<KrakenWebSocketDataSource>()),
+                    Exchange.Binance => new ExchangeWebSocketDataSource<BinanceTick>(
+                        wsClient, new BinanceParser(), new BinanceMapper(), dlq, exchange, logger),
+                    Exchange.Bybit => new ExchangeWebSocketDataSource<BybitTick>(
+                        wsClient, new BybitParser(), new BybitMapper(), dlq, exchange, logger),
+                    Exchange.Kraken => new ExchangeWebSocketDataSource<KrakenTick>(
+                        wsClient, new KrakenParser(), new KrakenMapper(), dlq, exchange, logger),
                     _ => throw new NotSupportedException($"Exchange {exchange} is not supported.")
                 };
             }

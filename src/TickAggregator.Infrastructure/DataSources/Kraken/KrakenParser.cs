@@ -4,9 +4,18 @@ namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
 public sealed class KrakenParser : IParser<KrakenTick>
 {
-    public IEnumerable<KrakenTick> Parse(string payload)
+    public bool TryParse(string payload, out IEnumerable<KrakenTick> items)
     {
-        var message = JsonSerializer.Deserialize<KrakenMessage>(payload)!;
-        return message.Data is { Length: > 0 } ? message.Data : [];
+        try
+        {
+            var message = JsonSerializer.Deserialize<KrakenMessage>(payload)!;
+            items = message.Data is { Length: > 0 } ? message.Data : [];
+            return true;
+        }
+        catch
+        {
+            items = [];
+            return false;
+        }
     }
 }
