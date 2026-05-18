@@ -26,7 +26,9 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         services.AddDbContext<AppDbContext>((sp, options) =>
-            options.UseNpgsql(sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString));
+            options.UseNpgsql(
+                sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString,
+                o => o.EnableRetryOnFailure()));
 
         services.AddScoped<ITickRepository, TickRepository>();
         services.AddMemoryCache();

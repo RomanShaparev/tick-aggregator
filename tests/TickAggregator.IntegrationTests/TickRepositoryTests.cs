@@ -8,7 +8,7 @@ using Xunit;
 
 namespace TickAggregator.IntegrationTests;
 
-public sealed class DatabaseTests : IAsyncLifetime
+public sealed class TickRepositoryTests : IAsyncLifetime
 {
     private readonly PostgresFixture _fixture = new();
 

@@ -23,6 +23,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TickAggregator.EndToEndTests", "tests\TickAggregator.EndToEndTests\TickAggregator.EndToEndTests.csproj", "{9B82235A-21CB-48D6-92B1-2D29D5D1D0B8}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demo", "demo", "{E5C3C661-4B7E-40CD-A4A6-FB7A2CDB41BB}"
+	ProjectSection(SolutionItems) = preProject
+		demo\docker-compose.yml = demo\docker-compose.yml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
