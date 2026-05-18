@@ -1,5 +1,6 @@
 using FluentAssertions;
-using TickAggregator.Infrastructure.Parsers;
+using TickAggregator.Domain.Enums;
+using TickAggregator.Infrastructure.Parsers.Kraken;
 using Xunit;
 
 namespace TickAggregator.UnitTests.Parsers;
@@ -30,7 +31,7 @@ public sealed class KrakenParserTests
         ticks.Should().HaveCount(1);
         var tick = ticks[0];
         tick.TradeId.Should().Be("59838473");
-        tick.Exchange.Should().Be("Kraken");
+        tick.Exchange.Should().Be(Exchange.Kraken);
         tick.Ticker.Should().Be("BTCUSD");
         tick.Price.Should().Be(50000.50m);
         tick.Volume.Should().Be(0.0015m);

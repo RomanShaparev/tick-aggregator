@@ -1,4 +1,5 @@
 using Dapper;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using TickAggregator.Infrastructure.Database;
@@ -20,7 +21,11 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
-        await TickRepository.EnsureSchemaAsync(ConnectionString);
+        var options = new DbContextOptionsBuilder<TickDbContext>()
+            .UseNpgsql(ConnectionString)
+            .Options;
+        await using var context = new TickDbContext(options);
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();

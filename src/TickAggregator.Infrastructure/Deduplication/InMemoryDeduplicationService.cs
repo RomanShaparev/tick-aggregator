@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
 
 namespace TickAggregator.Infrastructure.Deduplication;
@@ -15,7 +16,7 @@ public sealed class InMemoryDeduplicationService : IDeduplicationService, IDispo
         _cleanupTimer = new Timer(_ => Cleanup(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
-    public bool IsDuplicate(string exchange, string tradeId)
+    public bool IsDuplicate(Exchange exchange, string tradeId)
     {
         var key = $"{exchange}:{tradeId}";
         if (_seen.TryGetValue(key, out _))

@@ -1,17 +1,16 @@
 using FluentAssertions;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using TickAggregator.Application.Interfaces;
-using TickAggregator.Application.Messages;
+using TickAggregator.Application.Metrics;
 using TickAggregator.Application.Services;
+using TickAggregator.Domain.Entities;
+using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
-using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.Database;
 using TickAggregator.Infrastructure.Deduplication;
-using TickAggregator.Infrastructure.Parsers;
-using TickAggregator.Infrastructure.RabbitMq;
+using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.IntegrationTests.Infrastructure;
 using Xunit;
 
@@ -42,15 +41,13 @@ public sealed class FullPipelineTests : IAsyncLifetime
 
     private ServiceProvider BuildProvider(int batchMessageLimit, int batchTimeLimitMs)
     {
-        var dbOpts = Options.Create(new DatabaseOptions { ConnectionString = _postgres.ConnectionString });
         var services = new ServiceCollection()
             .AddLogging(b => b.SetMinimumLevel(LogLevel.Warning))
-            .AddSingleton<ITickRepository>(new TickRepository(dbOpts))
+            .AddDbContextFactory<TickDbContext>(options =>
+                options.UseNpgsql(_postgres.ConnectionString))
+            .AddSingleton<ITickRepository, TickRepository>()
             .AddSingleton<IDeduplicationService, InMemoryDeduplicationService>()
-            .AddSingleton<ITickCounter, TickCounterService>()
-            .AddSingleton<IExchangeParser, BinanceParser>()
-            .AddSingleton<IExchangeParser, KrakenParser>()
-            .AddSingleton<IExchangeParser, BybitParser>()
+            .AddSingleton<TickMetrics>()
             .AddSingleton<TickProcessingService>();
 
         services.AddMassTransit(x =>
@@ -69,10 +66,10 @@ public sealed class FullPipelineTests : IAsyncLifetime
                     h.Password(_rabbitMq.Password);
                 });
 
-                cfg.ReceiveEndpoint($"raw-ticks-test-{Guid.NewGuid():N}", e =>
+                cfg.ReceiveEndpoint($"ticks-test-{Guid.NewGuid():N}", e =>
                 {
                     e.Durable = true;
-                    e.AutoDelete = true; // auto-delete in tests
+                    e.AutoDelete = true;
                     e.PrefetchCount = 10;
                     e.ConfigureConsumer<RawTickBatchConsumer>(ctx);
                 });
@@ -96,14 +93,24 @@ public sealed class FullPipelineTests : IAsyncLifetime
         return count;
     }
 
+    private static Tick MakeTick(string tradeId, Exchange exchange = Exchange.Binance) => new()
+    {
+        TradeId = tradeId,
+        Exchange = exchange,
+        Ticker = "BTCUSDT",
+        Price = 50000m,
+        Volume = 0.001m,
+        Timestamp = DateTimeOffset.UtcNow,
+        ReceivedAt = DateTimeOffset.UtcNow,
+    };
+
     [Fact]
-    public async Task FullPipeline_BinanceTick_SavedToDatabase()
+    public async Task FullPipeline_Tick_SavedToDatabase()
     {
         await _postgres.ClearTicksAsync();
         var publisher = _provider!.GetRequiredService<IBus>();
 
-        var rawTick = """{"e":"trade","t":99991,"s":"BTCUSDT","p":"50000.00","q":"0.001","T":1716000000000}""";
-        await publisher.Publish(new RawTickMessage { Exchange = "Binance", Payload = rawTick });
+        await publisher.Publish(MakeTick("t-1"));
 
         var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(15));
         count.Should().Be(1);
@@ -115,11 +122,9 @@ public sealed class FullPipelineTests : IAsyncLifetime
         await _postgres.ClearTicksAsync();
         var publisher = _provider!.GetRequiredService<IBus>();
 
-        var rawTick = """{"e":"trade","t":77777,"s":"ETHUSDT","p":"3000.00","q":"0.1","T":1716000000000}""";
-        var message = new RawTickMessage { Exchange = "Binance", Payload = rawTick };
-
-        await publisher.Publish(message);
-        await publisher.Publish(message);
+        var tick = MakeTick("dup-1");
+        await publisher.Publish(tick);
+        await publisher.Publish(tick);
 
         var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(15));
         count.Should().Be(1);
@@ -131,21 +136,9 @@ public sealed class FullPipelineTests : IAsyncLifetime
         await _postgres.ClearTicksAsync();
         var publisher = _provider!.GetRequiredService<IBus>();
 
-        await publisher.Publish(new RawTickMessage
-        {
-            Exchange = "Binance",
-            Payload = """{"e":"trade","t":1001,"s":"BTCUSDT","p":"50000.00","q":"0.001","T":1716000000000}"""
-        });
-        await publisher.Publish(new RawTickMessage
-        {
-            Exchange = "Kraken",
-            Payload = """{"channel":"trade","data":[{"trade_id":2001,"symbol":"BTC/USD","side":"buy","price":50001.0,"qty":0.001,"timestamp":"2024-05-18T10:00:00.000000Z"}]}"""
-        });
-        await publisher.Publish(new RawTickMessage
-        {
-            Exchange = "Bybit",
-            Payload = """{"topic":"publicTrade.BTCUSDT","ts":1716000000000,"data":[{"i":"abc3001xyz","T":1716000000000,"p":"50002.00","v":"0.001","S":"Buy","s":"BTCUSDT"}]}"""
-        });
+        await publisher.Publish(MakeTick("e-1", Exchange.Binance));
+        await publisher.Publish(MakeTick("e-2", Exchange.Kraken));
+        await publisher.Publish(MakeTick("e-3", Exchange.Bybit));
 
         var count = await WaitForCountAsync(3, TimeSpan.FromSeconds(15));
         count.Should().Be(3);

@@ -1,5 +1,6 @@
 using FluentAssertions;
-using TickAggregator.Infrastructure.Parsers;
+using TickAggregator.Domain.Enums;
+using TickAggregator.Infrastructure.Parsers.Bybit;
 using Xunit;
 
 namespace TickAggregator.UnitTests.Parsers;
@@ -31,7 +32,7 @@ public sealed class BybitParserTests
         ticks.Should().HaveCount(1);
         var tick = ticks[0];
         tick.TradeId.Should().Be("abc123xyz456def7");
-        tick.Exchange.Should().Be("Bybit");
+        tick.Exchange.Should().Be(Exchange.Bybit);
         tick.Ticker.Should().Be("BTCUSDT");
         tick.Price.Should().Be(50000.50m);
         tick.Volume.Should().Be(0.001500m);
@@ -46,8 +47,8 @@ public sealed class BybitParserTests
     }
 
     [Fact]
-    public void ExchangeName_IsBybit()
+    public void Exchange_IsBybit()
     {
-        _parser.ExchangeName.Should().Be("Bybit");
+        _parser.Exchange.Should().Be(Exchange.Bybit);
     }
 }

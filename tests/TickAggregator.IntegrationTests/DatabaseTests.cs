@@ -1,7 +1,7 @@
 using FluentAssertions;
-using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using TickAggregator.Domain.Entities;
-using TickAggregator.Infrastructure.Configuration;
+using TickAggregator.Domain.Enums;
 using TickAggregator.Infrastructure.Database;
 using TickAggregator.IntegrationTests.Infrastructure;
 using Xunit;
@@ -17,8 +17,10 @@ public sealed class DatabaseTests : IAsyncLifetime
 
     private TickRepository CreateRepository()
     {
-        var opts = Options.Create(new DatabaseOptions { ConnectionString = _fixture.ConnectionString });
-        return new TickRepository(opts);
+        var options = new DbContextOptionsBuilder<TickDbContext>()
+            .UseNpgsql(_fixture.ConnectionString)
+            .Options;
+        return new TickRepository(new TickDbContext(options));
     }
 
     [Fact]
@@ -29,7 +31,7 @@ public sealed class DatabaseTests : IAsyncLifetime
         var tick = new Tick
         {
             TradeId = "t1",
-            Exchange = "Binance",
+            Exchange = Exchange.Binance,
             Ticker = "BTCUSDT",
             Price = 50000m,
             Volume = 0.001m,
@@ -51,7 +53,7 @@ public sealed class DatabaseTests : IAsyncLifetime
         var ticks = Enumerable.Range(1, 100).Select(i => new Tick
         {
             TradeId = $"batch-{i}",
-            Exchange = "Binance",
+            Exchange = Exchange.Binance,
             Ticker = "BTCUSDT",
             Price = 50000m + i,
             Volume = 0.001m,
@@ -63,33 +65,6 @@ public sealed class DatabaseTests : IAsyncLifetime
 
         var count = await _fixture.CountTicksAsync();
         count.Should().Be(100);
-    }
-
-    [Fact]
-    public async Task InsertBatch_DuplicateTradeId_OnConflictDoesNotThrow()
-    {
-        await _fixture.ClearTicksAsync();
-        var repo = CreateRepository();
-
-        // We use COPY which will throw on duplicate — but in-memory dedup prevents this in practice
-        // Testing that schema constraint exists
-        var tick = new Tick
-        {
-            TradeId = "dup-1",
-            Exchange = "Binance",
-            Ticker = "BTCUSDT",
-            Price = 50000m,
-            Volume = 0.001m,
-            Timestamp = DateTimeOffset.UtcNow,
-            ReceivedAt = DateTimeOffset.UtcNow,
-        };
-
-        await repo.InsertBatchAsync([tick], CancellationToken.None);
-
-        // Second insert with same trade_id — in real system dedup prevents this,
-        // here we verify the DB unique constraint exists by checking row count stays 1
-        var count = await _fixture.CountTicksAsync();
-        count.Should().Be(1);
     }
 
     [Fact]

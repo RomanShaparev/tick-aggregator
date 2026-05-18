@@ -1,5 +1,6 @@
 using FluentAssertions;
-using TickAggregator.Infrastructure.Parsers;
+using TickAggregator.Domain.Enums;
+using TickAggregator.Infrastructure.Parsers.Binance;
 using Xunit;
 
 namespace TickAggregator.UnitTests.Parsers;
@@ -18,7 +19,7 @@ public sealed class BinanceParserTests
         ticks.Should().HaveCount(1);
         var tick = ticks[0];
         tick.TradeId.Should().Be("12345");
-        tick.Exchange.Should().Be("Binance");
+        tick.Exchange.Should().Be(Exchange.Binance);
         tick.Ticker.Should().Be("BTCUSDT");
         tick.Price.Should().Be(50000.50m);
         tick.Volume.Should().Be(0.001500m);
@@ -33,8 +34,8 @@ public sealed class BinanceParserTests
     }
 
     [Fact]
-    public void ExchangeName_IsBinance()
+    public void Exchange_IsBinance()
     {
-        _parser.ExchangeName.Should().Be("Binance");
+        _parser.Exchange.Should().Be(Exchange.Binance);
     }
 }

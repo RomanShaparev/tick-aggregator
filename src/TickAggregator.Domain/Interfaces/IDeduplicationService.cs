@@ -1,6 +1,8 @@
+using TickAggregator.Domain.Enums;
+
 namespace TickAggregator.Domain.Interfaces;
 
 public interface IDeduplicationService
 {
-    bool IsDuplicate(string exchange, string tradeId);
+    bool IsDuplicate(Exchange exchange, string tradeId);
 }

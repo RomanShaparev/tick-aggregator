@@ -1,43 +1,47 @@
+using System.Diagnostics.Metrics;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using TickAggregator.Application.Messages;
+using TickAggregator.Application.Metrics;
 using TickAggregator.Application.Services;
 using TickAggregator.Domain.Entities;
+using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
 using TickAggregator.Infrastructure.Deduplication;
-using TickAggregator.Infrastructure.Parsers;
 using Xunit;
 
 namespace TickAggregator.UnitTests.Services;
 
-public sealed class TickProcessingServiceTests
+public sealed class TickProcessingServiceTests : IDisposable
 {
     private readonly ITickRepository _repository = Substitute.For<ITickRepository>();
-    private readonly TickCounterService _counter = new();
+    private readonly TickMetrics _metrics = new();
+
+    public void Dispose() => _metrics.Dispose();
 
     private TickProcessingService CreateService() =>
-        new(
-            [new BinanceParser(), new KrakenParser(), new BybitParser()],
-            new InMemoryDeduplicationService(),
+        new(new InMemoryDeduplicationService(),
             _repository,
-            _counter,
+            _metrics,
             NullLogger<TickProcessingService>.Instance);
 
-    [Fact]
-    public async Task ProcessBatch_ValidBinanceTick_CallsRepository()
+    private static Tick MakeTick(string tradeId = "1", Exchange exchange = Exchange.Binance) => new()
     {
-        var svc = CreateService();
-        var message = new RawTickMessage
-        {
-            Exchange = "Binance",
-            Payload = """{"e":"trade","t":1,"s":"BTCUSDT","p":"50000.00","q":"0.001","T":1716000000000}"""
-        };
+        TradeId = tradeId,
+        Exchange = exchange,
+        Ticker = "BTCUSDT",
+        Price = 50000m,
+        Volume = 0.001m,
+        Timestamp = DateTimeOffset.UtcNow,
+        ReceivedAt = DateTimeOffset.UtcNow,
+    };
 
-        var saved = await svc.ProcessBatchAsync([message], CancellationToken.None);
+    [Fact]
+    public async Task ProcessBatch_ValidTick_CallsRepository()
+    {
+        await CreateService().ProcessBatchAsync([MakeTick()], CancellationToken.None);
 
-        saved.Should().Be(1);
         await _repository.Received(1).InsertBatchAsync(
             Arg.Is<IReadOnlyList<Tick>>(list => list.Count == 1 && list[0].TradeId == "1"),
             Arg.Any<CancellationToken>());
@@ -46,30 +50,20 @@ public sealed class TickProcessingServiceTests
     [Fact]
     public async Task ProcessBatch_DuplicateTick_SavedOnlyOnce()
     {
-        var svc = CreateService();
-        var message = new RawTickMessage
-        {
-            Exchange = "Binance",
-            Payload = """{"e":"trade","t":42,"s":"BTCUSDT","p":"50000.00","q":"0.001","T":1716000000000}"""
-        };
+        var tick = MakeTick("42");
 
-        var saved = await svc.ProcessBatchAsync([message, message], CancellationToken.None);
+        await CreateService().ProcessBatchAsync([tick, tick], CancellationToken.None);
 
-        saved.Should().Be(1);
         await _repository.Received(1).InsertBatchAsync(
             Arg.Is<IReadOnlyList<Tick>>(list => list.Count == 1),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ProcessBatch_UnknownExchange_ReturnsZeroAndDoesNotThrow()
+    public async Task ProcessBatch_EmptyBatch_DoesNotCallRepository()
     {
-        var svc = CreateService();
-        var message = new RawTickMessage { Exchange = "UnknownExchange", Payload = "{}" };
+        await CreateService().ProcessBatchAsync([], CancellationToken.None);
 
-        var saved = await svc.ProcessBatchAsync([message], CancellationToken.None);
-
-        saved.Should().Be(0);
         await _repository.DidNotReceive().InsertBatchAsync(
             Arg.Any<IReadOnlyList<Tick>>(), Arg.Any<CancellationToken>());
     }
@@ -77,29 +71,20 @@ public sealed class TickProcessingServiceTests
     [Fact]
     public async Task ProcessBatch_CounterIncrementedPerUniqueTick()
     {
-        var svc = CreateService();
-        var message = new RawTickMessage
+        long captured = 0;
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
         {
-            Exchange = "Binance",
-            Payload = """{"e":"trade","t":100,"s":"BTCUSDT","p":"50000.00","q":"0.001","T":1716000000000}"""
+            if (instrument.Meter.Name == TickMetrics.MeterName)
+                l.EnableMeasurementEvents(instrument);
         };
+        listener.SetMeasurementEventCallback<long>((_, value, _, _) =>
+            Interlocked.Add(ref captured, value));
+        listener.Start();
 
-        await svc.ProcessBatchAsync([message], CancellationToken.None);
+        await CreateService().ProcessBatchAsync([MakeTick()], CancellationToken.None);
 
-        _counter.GetTotal().Should().Be(1);
-        _counter.GetByExchange()["Binance"].Should().Be(1);
-    }
-
-    [Fact]
-    public async Task ProcessBatch_EmptyBatch_DoesNotCallRepository()
-    {
-        var svc = CreateService();
-
-        var saved = await svc.ProcessBatchAsync([], CancellationToken.None);
-
-        saved.Should().Be(0);
-        await _repository.DidNotReceive().InsertBatchAsync(
-            Arg.Any<IReadOnlyList<Tick>>(), Arg.Any<CancellationToken>());
+        captured.Should().Be(1);
     }
 
     [Fact]
@@ -108,14 +93,8 @@ public sealed class TickProcessingServiceTests
         _repository.InsertBatchAsync(Arg.Any<IReadOnlyList<Tick>>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("DB error"));
 
-        var svc = CreateService();
-        var message = new RawTickMessage
-        {
-            Exchange = "Binance",
-            Payload = """{"e":"trade","t":999,"s":"BTCUSDT","p":"50000.00","q":"0.001","T":1716000000000}"""
-        };
+        var act = async () => await CreateService().ProcessBatchAsync([MakeTick()], CancellationToken.None);
 
-        var act = async () => await svc.ProcessBatchAsync([message], CancellationToken.None);
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 }

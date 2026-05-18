@@ -1,9 +1,10 @@
 using TickAggregator.Domain.Entities;
+using TickAggregator.Domain.Enums;
 
-namespace TickAggregator.Domain.Interfaces;
+namespace TickAggregator.Infrastructure.Parsers;
 
 public interface IExchangeParser
 {
-    string ExchangeName { get; }
+    Exchange Exchange { get; }
     IReadOnlyList<Tick> Parse(string rawMessage);
 }

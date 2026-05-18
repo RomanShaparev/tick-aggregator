@@ -1,26 +1,32 @@
 using MassTransit;
-using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
 using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.Database;
 using TickAggregator.Infrastructure.Extensions;
-using TickAggregator.Infrastructure.RabbitMq;
-using TickAggregator.Worker.Configuration;
+using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Worker.Workers;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((ctx, services) =>
     {
-        services.Configure<RabbitMqOptions>(ctx.Configuration.GetSection(RabbitMqOptions.Section));
-        services.Configure<DatabaseOptions>(ctx.Configuration.GetSection(DatabaseOptions.Section));
-        services.Configure<ExchangeOptions>(ctx.Configuration.GetSection(ExchangeOptions.Section));
+        services.AddOptions<RabbitMqOptions>()
+            .Bind(ctx.Configuration.GetSection(RabbitMqOptions.Section))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<DatabaseOptions>()
+            .Bind(ctx.Configuration.GetSection(DatabaseOptions.Section))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddInfrastructure();
 
         var mq = ctx.Configuration.GetSection(RabbitMqOptions.Section).Get<RabbitMqOptions>()
-                 ?? new RabbitMqOptions();
+                 ?? throw new InvalidOperationException($"Configuration section '{RabbitMqOptions.Section}' is missing.");
+        var dataSources = ctx.Configuration.GetSection("DataSources").Get<List<DataSourceConfig>>() ?? [];
 
-        // AddMassTransit регистрирует IBus (singleton) и запускает шину через IHostedService.
-        // Шина стартует раньше ExchangeCollectorWorker (порядок регистрации).
+        services.AddDataSources(dataSources);
+
         services.AddMassTransit(x =>
         {
             x.AddConsumer<RawTickBatchConsumer>(c =>
@@ -29,7 +35,7 @@ var host = Host.CreateDefaultBuilder(args)
                     .SetTimeLimit(TimeSpan.FromMilliseconds(mq.BatchTimeLimitMs))
                     .SetConcurrencyLimit(1)));
 
-            x.UsingRabbitMq((ctx, cfg) =>
+            x.UsingRabbitMq((busCtx, cfg) =>
             {
                 cfg.Host(mq.Host, mq.Port, mq.VirtualHost, h =>
                 {
@@ -42,7 +48,7 @@ var host = Host.CreateDefaultBuilder(args)
                     e.Durable = true;
                     e.AutoDelete = false;
                     e.PrefetchCount = mq.PrefetchCount;
-                    e.ConfigureConsumer<RawTickBatchConsumer>(ctx);
+                    e.ConfigureConsumer<RawTickBatchConsumer>(busCtx);
                 });
             });
         });
@@ -52,7 +58,10 @@ var host = Host.CreateDefaultBuilder(args)
     })
     .Build();
 
-var dbOptions = host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
-await TickRepository.EnsureSchemaAsync(dbOptions.ConnectionString);
+await using (var scope = host.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<TickDbContext>();
+    await db.Database.MigrateAsync();
+}
 
 await host.RunAsync();
