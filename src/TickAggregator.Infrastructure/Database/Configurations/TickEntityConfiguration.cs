@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TickAggregator.Domain.Entities;
 
-namespace TickAggregator.Infrastructure.Database;
+namespace TickAggregator.Infrastructure.Database.Configurations;
 
 public sealed class TickEntityConfiguration : IEntityTypeConfiguration<Tick>
 {
@@ -40,11 +40,6 @@ public sealed class TickEntityConfiguration : IEntityTypeConfiguration<Tick>
 
         builder.Property(t => t.Timestamp)
             .HasColumnName("timestamp")
-            .HasColumnType("timestamptz")
-            .IsRequired();
-
-        builder.Property(t => t.ReceivedAt)
-            .HasColumnName("received_at")
             .HasColumnType("timestamptz")
             .IsRequired();
 

@@ -6,7 +6,7 @@ using TickAggregator.Infrastructure.WebSocket;
 
 namespace TickAggregator.Infrastructure.DataSources.Binance;
 
-public sealed class BinanceWebSocketDataSource : IExchangeDataSource, IAsyncDisposable
+public sealed class BinanceWebSocketDataSource : IExchangeDataSource
 {
     private readonly ExchangeWebSocketClient _client;
     private readonly ILogger<BinanceWebSocketDataSource> _logger;
@@ -36,6 +36,4 @@ public sealed class BinanceWebSocketDataSource : IExchangeDataSource, IAsyncDisp
             yield return raw.ToTick();
         }
     }
-
-    public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

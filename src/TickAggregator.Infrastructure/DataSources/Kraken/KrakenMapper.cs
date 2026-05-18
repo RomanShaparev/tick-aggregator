@@ -13,6 +13,5 @@ internal static class KrakenMapper
         Price = raw.Price,
         Volume = raw.Qty,
         Timestamp = raw.Timestamp,
-        ReceivedAt = DateTimeOffset.UtcNow,
     };
 }

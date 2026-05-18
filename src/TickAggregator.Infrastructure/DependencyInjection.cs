@@ -9,30 +9,32 @@ using TickAggregator.Application.Services;
 using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
 using TickAggregator.Infrastructure.Configuration;
-using TickAggregator.Infrastructure.DataSources;
 using TickAggregator.Infrastructure.Database;
 using TickAggregator.Infrastructure.DataSources.Binance;
 using TickAggregator.Infrastructure.DataSources.Bybit;
 using TickAggregator.Infrastructure.DataSources.Kraken;
+using TickAggregator.Infrastructure.Caching;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
 
-namespace TickAggregator.Infrastructure.Extensions;
+namespace TickAggregator.Infrastructure;
 
-public static class ServiceCollectionExtensions
+public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
-        services.AddDbContext<TickDbContext>((sp, options) =>
+        services.AddDbContext<AppDbContext>((sp, options) =>
             options.UseNpgsql(sp.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString));
 
         services.AddScoped<ITickRepository, TickRepository>();
-        services.AddSingleton<IDeduplicationService, InMemoryDeduplicationService>();
+        services.AddMemoryCache();
+        services.AddSingleton<ICache, InMemoryCache>();
+        services.AddSingleton<IDeduplicationService, DeduplicationService>();
         services.AddSingleton<TickMetrics>();
 
         services.AddScoped<TickProcessingService>();
 
-        services.AddSingleton<IMessageProducer, MassTransitMessageProducer>();
+        services.AddSingleton<ITickProducer, TickProducer>();
         services.AddSingleton<TickCollectorService>();
 
         return services;

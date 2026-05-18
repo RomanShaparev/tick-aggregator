@@ -7,13 +7,12 @@ using Polly.Retry;
 
 namespace TickAggregator.Infrastructure.WebSocket;
 
-public sealed class ExchangeWebSocketClient : IAsyncDisposable
+public sealed class ExchangeWebSocketClient
 {
     private readonly Uri _uri;
     private readonly ResiliencePipeline _pipeline;
     private readonly ILogger _logger;
     private const int ReceiveBufferSize = 16384;
-    private Task _producerTask = Task.CompletedTask;
 
     public ExchangeWebSocketClient(
         Uri uri,
@@ -45,7 +44,7 @@ public sealed class ExchangeWebSocketClient : IAsyncDisposable
     public IAsyncEnumerable<string> StreamAsync(CancellationToken ct)
     {
         var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
-        _producerTask = ProduceAsync(channel.Writer, ct);
+        _ = ProduceAsync(channel.Writer, ct);
         return channel.Reader.ReadAllAsync(ct);
     }
 
@@ -67,10 +66,6 @@ public sealed class ExchangeWebSocketClient : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Streaming from {Uri} failed permanently", _uri);
         }
         finally
         {
@@ -115,10 +110,5 @@ public sealed class ExchangeWebSocketClient : IAsyncDisposable
                     yield return message;
             }
         }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _producerTask;
     }
 }

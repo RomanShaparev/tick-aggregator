@@ -8,9 +8,9 @@ using TickAggregator.Infrastructure.Database;
 
 #nullable disable
 
-namespace TickAggregator.Infrastructure.Database.Migrations
+namespace TickAggregator.Infrastructure.Migrations
 {
-    [DbContext(typeof(TickDbContext))]
+    [DbContext(typeof(AppDbContext))]
     partial class TickDbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
@@ -37,10 +37,6 @@ namespace TickAggregator.Infrastructure.Database.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric(18,8)")
                         .HasColumnName("price");
-
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("received_at");
 
                     b.Property<string>("Ticker")
                         .IsRequired()

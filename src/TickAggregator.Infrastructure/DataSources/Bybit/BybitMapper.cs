@@ -13,6 +13,5 @@ internal static class BybitMapper
         Price = decimal.Parse(raw.Price, System.Globalization.CultureInfo.InvariantCulture),
         Volume = decimal.Parse(raw.Volume, System.Globalization.CultureInfo.InvariantCulture),
         Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(raw.TradeTimeMs),
-        ReceivedAt = DateTimeOffset.UtcNow,
     };
 }

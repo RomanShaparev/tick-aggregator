@@ -6,7 +6,7 @@ using TickAggregator.Infrastructure.WebSocket;
 
 namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
-public sealed class KrakenWebSocketDataSource : IExchangeDataSource, IAsyncDisposable
+public sealed class KrakenWebSocketDataSource : IExchangeDataSource
 {
     private readonly ExchangeWebSocketClient _client;
     private readonly ILogger<KrakenWebSocketDataSource> _logger;
@@ -41,6 +41,4 @@ public sealed class KrakenWebSocketDataSource : IExchangeDataSource, IAsyncDispo
                 yield return raw.ToTick();
         }
     }
-
-    public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

@@ -8,6 +8,10 @@ using TickAggregator.Application.Services;
 using TickAggregator.Domain.Entities;
 using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using TickAggregator.Infrastructure.Caching;
+using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.Deduplication;
 using Xunit;
 
@@ -21,7 +25,9 @@ public sealed class TickProcessingServiceTests : IDisposable
     public void Dispose() => _metrics.Dispose();
 
     private TickProcessingService CreateService() =>
-        new(new InMemoryDeduplicationService(),
+        new(new DeduplicationService(
+                new InMemoryCache(new MemoryCache(new MemoryCacheOptions())),
+                Options.Create(new DeduplicationOptions())),
             _repository,
             _metrics,
             NullLogger<TickProcessingService>.Instance);
@@ -34,7 +40,6 @@ public sealed class TickProcessingServiceTests : IDisposable
         Price = 50000m,
         Volume = 0.001m,
         Timestamp = DateTimeOffset.UtcNow,
-        ReceivedAt = DateTimeOffset.UtcNow,
     };
 
     [Fact]

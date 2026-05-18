@@ -6,7 +6,7 @@ using TickAggregator.Infrastructure.WebSocket;
 
 namespace TickAggregator.Infrastructure.DataSources.Bybit;
 
-public sealed class BybitWebSocketDataSource : IExchangeDataSource, IAsyncDisposable
+public sealed class BybitWebSocketDataSource : IExchangeDataSource
 {
     private readonly ExchangeWebSocketClient _client;
     private readonly ILogger<BybitWebSocketDataSource> _logger;
@@ -41,6 +41,4 @@ public sealed class BybitWebSocketDataSource : IExchangeDataSource, IAsyncDispos
                 yield return raw.ToTick();
         }
     }
-
-    public ValueTask DisposeAsync() => _client.DisposeAsync();
 }

@@ -9,6 +9,7 @@ using TickAggregator.Application.Services;
 using TickAggregator.Domain.Entities;
 using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
+using TickAggregator.Infrastructure.Caching;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
 using Xunit;
@@ -21,14 +22,16 @@ public sealed class MessageQueueTests
     {
         return new ServiceCollection()
             .AddSingleton(repository)
-            .AddSingleton<IDeduplicationService, InMemoryDeduplicationService>()
+            .AddMemoryCache()
+            .AddSingleton<ICache, InMemoryCache>()
+            .AddSingleton<IDeduplicationService, DeduplicationService>()
             .AddSingleton(new TickMetrics())
             .AddSingleton<TickProcessingService>()
-            .AddSingleton(NullLogger<RawTickBatchConsumer>.Instance)
+            .AddSingleton(NullLogger<TickBatchConsumer>.Instance)
             .AddSingleton(NullLogger<TickProcessingService>.Instance)
             .AddMassTransitTestHarness(x =>
             {
-                x.AddConsumer<RawTickBatchConsumer>(c =>
+                x.AddConsumer<TickBatchConsumer>(c =>
                     c.Options<BatchOptions>(o => o
                         .SetMessageLimit(10)
                         .SetTimeLimit(TimeSpan.FromMilliseconds(200))
@@ -45,7 +48,6 @@ public sealed class MessageQueueTests
         Price = 50000m,
         Volume = 0.001m,
         Timestamp = DateTimeOffset.UtcNow,
-        ReceivedAt = DateTimeOffset.UtcNow,
     };
 
     [Fact]

@@ -4,11 +4,11 @@ using TickAggregator.Domain.Entities;
 
 namespace TickAggregator.Infrastructure.Messaging;
 
-public sealed class MassTransitMessageProducer : IMessageProducer
+public sealed class TickProducer : ITickProducer
 {
     private readonly IBus _bus;
 
-    public MassTransitMessageProducer(IBus bus) => _bus = bus;
+    public TickProducer(IBus bus) => _bus = bus;
 
     public Task PublishAsync(Tick tick, CancellationToken ct)
         => _bus.Publish(tick, ct);

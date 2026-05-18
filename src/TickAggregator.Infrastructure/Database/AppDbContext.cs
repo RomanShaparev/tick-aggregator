@@ -3,12 +3,12 @@ using TickAggregator.Domain.Entities;
 
 namespace TickAggregator.Infrastructure.Database;
 
-public sealed class TickDbContext : DbContext
+public sealed class AppDbContext : DbContext
 {
     public DbSet<Tick> Ticks => Set<Tick>();
 
-    public TickDbContext(DbContextOptions<TickDbContext> options) : base(options) { }
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-        => modelBuilder.ApplyConfigurationsFromAssembly(typeof(TickDbContext).Assembly);
+        => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 }

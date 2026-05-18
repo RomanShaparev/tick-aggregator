@@ -9,6 +9,7 @@ using TickAggregator.Domain.Entities;
 using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
 using TickAggregator.Infrastructure.Database;
+using TickAggregator.Infrastructure.Caching;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.IntegrationTests.Infrastructure;
@@ -43,16 +44,18 @@ public sealed class FullPipelineTests : IAsyncLifetime
     {
         var services = new ServiceCollection()
             .AddLogging(b => b.SetMinimumLevel(LogLevel.Warning))
-            .AddDbContextFactory<TickDbContext>(options =>
+            .AddDbContextFactory<AppDbContext>(options =>
                 options.UseNpgsql(_postgres.ConnectionString))
             .AddSingleton<ITickRepository, TickRepository>()
-            .AddSingleton<IDeduplicationService, InMemoryDeduplicationService>()
+            .AddMemoryCache()
+            .AddSingleton<ICache, InMemoryCache>()
+            .AddSingleton<IDeduplicationService, DeduplicationService>()
             .AddSingleton<TickMetrics>()
             .AddSingleton<TickProcessingService>();
 
         services.AddMassTransit(x =>
         {
-            x.AddConsumer<RawTickBatchConsumer>(c =>
+            x.AddConsumer<TickBatchConsumer>(c =>
                 c.Options<BatchOptions>(o => o
                     .SetMessageLimit(batchMessageLimit)
                     .SetTimeLimit(TimeSpan.FromMilliseconds(batchTimeLimitMs))
@@ -71,7 +74,7 @@ public sealed class FullPipelineTests : IAsyncLifetime
                     e.Durable = true;
                     e.AutoDelete = true;
                     e.PrefetchCount = 10;
-                    e.ConfigureConsumer<RawTickBatchConsumer>(ctx);
+                    e.ConfigureConsumer<TickBatchConsumer>(ctx);
                 });
             });
         });
@@ -101,7 +104,6 @@ public sealed class FullPipelineTests : IAsyncLifetime
         Price = 50000m,
         Volume = 0.001m,
         Timestamp = DateTimeOffset.UtcNow,
-        ReceivedAt = DateTimeOffset.UtcNow,
     };
 
     [Fact]

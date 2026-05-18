@@ -7,12 +7,12 @@ namespace TickAggregator.Application.Services;
 public sealed class TickCollectorService
 {
     private readonly IEnumerable<IExchangeDataSource> _dataSources;
-    private readonly IMessageProducer _producer;
+    private readonly ITickProducer _producer;
     private readonly ILogger<TickCollectorService> _logger;
 
     public TickCollectorService(
         IEnumerable<IExchangeDataSource> dataSources,
-        IMessageProducer producer,
+        ITickProducer producer,
         ILogger<TickCollectorService> logger)
     {
         _dataSources = dataSources;
@@ -27,8 +27,14 @@ public sealed class TickCollectorService
     {
         _logger.LogInformation("Starting collector for {DataSource}", source.GetType().Name);
 
-        await foreach (var tick in source.StreamAsync(ct))
-            await _producer.PublishAsync(tick, ct);
+        try
+        {
+            await foreach (var tick in source.StreamAsync(ct))
+                await _producer.PublishAsync(tick, ct);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         _logger.LogInformation("Collector stopped for {DataSource}", source.GetType().Name);
     }

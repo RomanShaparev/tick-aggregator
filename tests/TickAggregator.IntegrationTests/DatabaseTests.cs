@@ -17,10 +17,10 @@ public sealed class DatabaseTests : IAsyncLifetime
 
     private TickRepository CreateRepository()
     {
-        var options = new DbContextOptionsBuilder<TickDbContext>()
+        var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
             .Options;
-        return new TickRepository(new TickDbContext(options));
+        return new TickRepository(new AppDbContext(options));
     }
 
     [Fact]
@@ -36,7 +36,6 @@ public sealed class DatabaseTests : IAsyncLifetime
             Price = 50000m,
             Volume = 0.001m,
             Timestamp = DateTimeOffset.UtcNow,
-            ReceivedAt = DateTimeOffset.UtcNow,
         };
 
         await repo.InsertBatchAsync([tick], CancellationToken.None);
@@ -58,7 +57,6 @@ public sealed class DatabaseTests : IAsyncLifetime
             Price = 50000m + i,
             Volume = 0.001m,
             Timestamp = DateTimeOffset.UtcNow,
-            ReceivedAt = DateTimeOffset.UtcNow,
         }).ToList();
 
         await repo.InsertBatchAsync(ticks, CancellationToken.None);

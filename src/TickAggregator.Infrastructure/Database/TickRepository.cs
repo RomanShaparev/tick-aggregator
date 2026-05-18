@@ -6,9 +6,9 @@ namespace TickAggregator.Infrastructure.Database;
 
 public sealed class TickRepository : ITickRepository
 {
-    private readonly TickDbContext _context;
+    private readonly AppDbContext _context;
 
-    public TickRepository(TickDbContext context)
+    public TickRepository(AppDbContext context)
         => _context = context;
 
     public async Task InsertBatchAsync(IReadOnlyList<Tick> ticks, CancellationToken ct)

@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TickAggregator.Infrastructure.Database.Migrations
+namespace TickAggregator.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class RemoveReceivedAt : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -20,8 +20,7 @@ namespace TickAggregator.Infrastructure.Database.Migrations
                     ticker = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     price = table.Column<decimal>(type: "numeric(18,8)", nullable: false),
                     volume = table.Column<decimal>(type: "numeric(18,8)", nullable: false),
-                    timestamp = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false),
-                    received_at = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
+                    timestamp = table.Column<DateTimeOffset>(type: "timestamptz", nullable: false)
                 },
                 constraints: table =>
                 {

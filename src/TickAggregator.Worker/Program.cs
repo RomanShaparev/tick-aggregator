@@ -1,8 +1,8 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using TickAggregator.Infrastructure;
 using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.Database;
-using TickAggregator.Infrastructure.Extensions;
 using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.Worker.Workers;
 
@@ -19,6 +19,11 @@ var host = Host.CreateDefaultBuilder(args)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<DeduplicationOptions>()
+            .Bind(ctx.Configuration.GetSection(DeduplicationOptions.Section))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddInfrastructure();
 
         var mq = ctx.Configuration.GetSection(RabbitMqOptions.Section).Get<RabbitMqOptions>()
@@ -29,7 +34,7 @@ var host = Host.CreateDefaultBuilder(args)
 
         services.AddMassTransit(x =>
         {
-            x.AddConsumer<RawTickBatchConsumer>(c =>
+            x.AddConsumer<TickBatchConsumer>(c =>
                 c.Options<BatchOptions>(o => o
                     .SetMessageLimit(mq.BatchMessageLimit)
                     .SetTimeLimit(TimeSpan.FromMilliseconds(mq.BatchTimeLimitMs))
@@ -48,7 +53,7 @@ var host = Host.CreateDefaultBuilder(args)
                     e.Durable = true;
                     e.AutoDelete = false;
                     e.PrefetchCount = mq.PrefetchCount;
-                    e.ConfigureConsumer<RawTickBatchConsumer>(busCtx);
+                    e.ConfigureConsumer<TickBatchConsumer>(busCtx);
                 });
             });
         });
@@ -60,7 +65,7 @@ var host = Host.CreateDefaultBuilder(args)
 
 await using (var scope = host.Services.CreateAsyncScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<TickDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 }
 

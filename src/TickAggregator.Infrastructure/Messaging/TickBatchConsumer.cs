@@ -5,12 +5,12 @@ using TickAggregator.Domain.Entities;
 
 namespace TickAggregator.Infrastructure.Messaging;
 
-public sealed class RawTickBatchConsumer : IConsumer<Batch<Tick>>
+public sealed class TickBatchConsumer : IConsumer<Batch<Tick>>
 {
     private readonly TickProcessingService _processor;
-    private readonly ILogger<RawTickBatchConsumer> _logger;
+    private readonly ILogger<TickBatchConsumer> _logger;
 
-    public RawTickBatchConsumer(TickProcessingService processor, ILogger<RawTickBatchConsumer> logger)
+    public TickBatchConsumer(TickProcessingService processor, ILogger<TickBatchConsumer> logger)
     {
         _processor = processor;
         _logger = logger;

@@ -9,11 +9,11 @@ using TickAggregator.Infrastructure.Database;
 
 #nullable disable
 
-namespace TickAggregator.Infrastructure.Database.Migrations
+namespace TickAggregator.Infrastructure.Migrations
 {
-    [DbContext(typeof(TickDbContext))]
-    [Migration("20260517101807_InitialCreate")]
-    partial class InitialCreate
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260518055924_RemoveReceivedAt")]
+    partial class RemoveReceivedAt
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -40,10 +40,6 @@ namespace TickAggregator.Infrastructure.Database.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric(18,8)")
                         .HasColumnName("price");
-
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("received_at");
 
                     b.Property<string>("Ticker")
                         .IsRequired()
