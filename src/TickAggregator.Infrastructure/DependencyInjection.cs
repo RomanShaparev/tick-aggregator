@@ -74,11 +74,11 @@ public static class DependencyInjection
                 return exchange switch
                 {
                     Exchange.Binance => new ExchangeWebSocketDataSource<BinanceTick>(
-                        wsClient, new BinanceParser(), new BinanceMapper(), dlq, exchange, logger),
+                        wsClient, new BinanceTickParser(), new BinanceTickMapper(), dlq, exchange, logger),
                     Exchange.Bybit => new ExchangeWebSocketDataSource<BybitTick>(
-                        wsClient, new BybitParser(), new BybitMapper(), dlq, exchange, logger),
+                        wsClient, new BybitTickParser(), new BybitTickMapper(), dlq, exchange, logger),
                     Exchange.Kraken => new ExchangeWebSocketDataSource<KrakenTick>(
-                        wsClient, new KrakenParser(), new KrakenMapper(), dlq, exchange, logger),
+                        wsClient, new KrakenTickParser(), new KrakenTickMapper(), dlq, exchange, logger),
                     _ => throw new NotSupportedException($"Exchange {exchange} is not supported.")
                 };
             }

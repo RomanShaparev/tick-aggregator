@@ -11,23 +11,23 @@ namespace TickAggregator.Infrastructure.DataSources;
 public class ExchangeWebSocketDataSource<T> : IExchangeDataSource
 {
     private readonly IExchangeWebSocketClient _client;
-    private readonly IParser<T> _parser;
-    private readonly IMapper<T> _mapper;
+    private readonly ITickParser<T> _tickParser;
+    private readonly ITickMapper<T> _tickMapper;
     private readonly IDlqProducer _dlq;
     private readonly Exchange _exchange;
     private readonly ILogger _logger;
 
     public ExchangeWebSocketDataSource(
         IExchangeWebSocketClient client,
-        IParser<T> parser,
-        IMapper<T> mapper,
+        ITickParser<T> tickParser,
+        ITickMapper<T> tickMapper,
         IDlqProducer dlq,
         Exchange exchange,
         ILogger logger)
     {
         _client = client;
-        _parser = parser;
-        _mapper = mapper;
+        _tickParser = tickParser;
+        _tickMapper = tickMapper;
         _dlq = dlq;
         _exchange = exchange;
         _logger = logger;
@@ -37,7 +37,7 @@ public class ExchangeWebSocketDataSource<T> : IExchangeDataSource
     {
         await foreach (var payload in _client.StreamAsync(ct))
         {
-            if (!_parser.TryParse(payload, out var items))
+            if (!_tickParser.TryParse(payload, out var items))
             {
                 _logger.LogWarning("Failed to parse message from {Exchange}, sending to DLQ", _exchange);
                 await _dlq.SendAsync(new InvalidMessage(_exchange, payload), ct);
@@ -45,7 +45,7 @@ public class ExchangeWebSocketDataSource<T> : IExchangeDataSource
             }
             
             foreach (var raw in items)
-                yield return _mapper.Map(raw);
+                yield return _tickMapper.Map(raw);
         }
     }
 }

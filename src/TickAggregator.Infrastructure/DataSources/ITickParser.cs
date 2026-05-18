@@ -1,6 +1,6 @@
 namespace TickAggregator.Infrastructure.DataSources;
 
-public interface IParser<T>
+public interface ITickParser<T>
 {
     bool TryParse(string payload, out IEnumerable<T> items);
 }

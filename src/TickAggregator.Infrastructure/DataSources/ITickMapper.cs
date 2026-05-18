@@ -2,7 +2,7 @@ using TickAggregator.Domain.Entities;
 
 namespace TickAggregator.Infrastructure.DataSources;
 
-public interface IMapper<T>
+public interface ITickMapper<T>
 {
-    Tick Map(T raw);
+    Tick Map(T exchangeTick);
 }

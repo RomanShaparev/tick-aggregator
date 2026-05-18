@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
-public sealed class KrakenParser : IParser<KrakenTick>
+public sealed class KrakenTickParser : ITickParser<KrakenTick>
 {
     public bool TryParse(string payload, out IEnumerable<KrakenTick> items)
     {

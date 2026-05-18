@@ -14,7 +14,7 @@ namespace TickAggregator.UnitTests.DataSources;
 public sealed class KrakenWebSocketDataSourceTests
 {
     private static ExchangeWebSocketDataSource<KrakenTick> CreateSource(IExchangeWebSocketClient client)
-        => new(client, new KrakenParser(), new KrakenMapper(), Substitute.For<IDlqProducer>(), Exchange.Kraken, NullLogger.Instance);
+        => new(client, new KrakenTickParser(), new KrakenTickMapper(), Substitute.For<IDlqProducer>(), Exchange.Kraken, NullLogger.Instance);
 
     private static async IAsyncEnumerable<string> Payloads(
         IEnumerable<string> items,

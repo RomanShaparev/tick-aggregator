@@ -14,7 +14,7 @@ namespace TickAggregator.UnitTests.DataSources;
 public sealed class BinanceWebSocketDataSourceTests
 {
     private static ExchangeWebSocketDataSource<BinanceTick> CreateSource(IExchangeWebSocketClient client)
-        => new(client, new BinanceParser(), new BinanceMapper(), Substitute.For<IDlqProducer>(), Exchange.Binance, NullLogger.Instance);
+        => new(client, new BinanceTickParser(), new BinanceTickMapper(), Substitute.For<IDlqProducer>(), Exchange.Binance, NullLogger.Instance);
 
     private static async IAsyncEnumerable<string> Payloads(
         IEnumerable<string> items,
@@ -54,7 +54,7 @@ public sealed class BinanceWebSocketDataSourceTests
         var client = Substitute.For<IExchangeWebSocketClient>();
         client.StreamAsync(Arg.Any<CancellationToken>()).Returns(Payloads(["not-json"]));
         var source = new ExchangeWebSocketDataSource<BinanceTick>(
-            client, new BinanceParser(), new BinanceMapper(), dlq, Exchange.Binance, NullLogger.Instance);
+            client, new BinanceTickParser(), new BinanceTickMapper(), dlq, Exchange.Binance, NullLogger.Instance);
 
         var ticks = await source.StreamAsync(default).ToListAsync();
 

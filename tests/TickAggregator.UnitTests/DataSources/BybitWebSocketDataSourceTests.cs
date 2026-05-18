@@ -14,7 +14,7 @@ namespace TickAggregator.UnitTests.DataSources;
 public sealed class BybitWebSocketDataSourceTests
 {
     private static ExchangeWebSocketDataSource<BybitTick> CreateSource(IExchangeWebSocketClient client)
-        => new(client, new BybitParser(), new BybitMapper(), Substitute.For<IDlqProducer>(), Exchange.Bybit, NullLogger.Instance);
+        => new(client, new BybitTickParser(), new BybitTickMapper(), Substitute.For<IDlqProducer>(), Exchange.Bybit, NullLogger.Instance);
 
     private static async IAsyncEnumerable<string> Payloads(
         IEnumerable<string> items,

@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace TickAggregator.Infrastructure.DataSources.Bybit;
 
-public sealed class BybitParser : IParser<BybitTick>
+public sealed class BybitTickParser : ITickParser<BybitTick>
 {
     public bool TryParse(string payload, out IEnumerable<BybitTick> items)
     {
