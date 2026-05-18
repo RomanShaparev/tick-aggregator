@@ -50,8 +50,6 @@ public sealed class ProgramHostTests : IAsyncLifetime
             ["RabbitMq:PrefetchCount"] = "10",
             ["Database:ConnectionString"] = _postgres.ConnectionString,
             ["Deduplication:TtlSeconds"] = "5",
-            ["DataSources:0:Name"] = "Binance",
-            ["DataSources:0:Url"] = "ws://localhost:1/ws/binance",
         };
 
         return HostBuilderFactory.Create([])
