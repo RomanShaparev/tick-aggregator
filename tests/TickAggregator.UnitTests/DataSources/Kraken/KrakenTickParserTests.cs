@@ -2,7 +2,7 @@ using FluentAssertions;
 using TickAggregator.Infrastructure.DataSources.Kraken;
 using Xunit;
 
-namespace TickAggregator.UnitTests.DataSources;
+namespace TickAggregator.UnitTests.DataSources.Kraken;
 
 public sealed class KrakenTickParserTests
 {

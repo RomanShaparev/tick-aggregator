@@ -2,7 +2,7 @@ using FluentAssertions;
 using TickAggregator.Infrastructure.DataSources.Bybit;
 using Xunit;
 
-namespace TickAggregator.UnitTests.DataSources;
+namespace TickAggregator.UnitTests.DataSources.Bybit;
 
 public sealed class BybitTickParserTests
 {

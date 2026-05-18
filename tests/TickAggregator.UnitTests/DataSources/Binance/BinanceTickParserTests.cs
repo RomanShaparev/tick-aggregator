@@ -2,7 +2,7 @@ using FluentAssertions;
 using TickAggregator.Infrastructure.DataSources.Binance;
 using Xunit;
 
-namespace TickAggregator.UnitTests.DataSources;
+namespace TickAggregator.UnitTests.DataSources.Binance;
 
 public sealed class BinanceTickParserTests
 {

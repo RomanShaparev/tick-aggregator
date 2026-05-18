@@ -1,7 +1,7 @@
 using Testcontainers.RabbitMq;
 using Xunit;
 
-namespace TickAggregator.IntegrationTests.Infrastructure;
+namespace TickAggregator.EndToEndTests.Infrastructure;
 
 public sealed class RabbitMqFixture : IAsyncLifetime
 {
