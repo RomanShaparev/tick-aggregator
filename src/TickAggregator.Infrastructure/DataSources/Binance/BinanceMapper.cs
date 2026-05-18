@@ -3,9 +3,9 @@ using TickAggregator.Domain.Enums;
 
 namespace TickAggregator.Infrastructure.DataSources.Binance;
 
-internal static class BinanceMapper
+public sealed class BinanceMapper : IMapper<BinanceTick>
 {
-    internal static Tick ToTick(this BinanceTick raw) => new()
+    public Tick Map(BinanceTick raw) => new()
     {
         TradeId = raw.TradeId.ToString(),
         Exchange = Exchange.Binance,

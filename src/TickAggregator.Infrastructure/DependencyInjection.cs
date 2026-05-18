@@ -16,6 +16,7 @@ using TickAggregator.Infrastructure.DataSources.Kraken;
 using TickAggregator.Infrastructure.Caching;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
+using TickAggregator.Infrastructure.WebSocket;
 
 namespace TickAggregator.Infrastructure;
 
@@ -60,16 +61,32 @@ public static class DependencyInjection
             var initialDelay = TimeSpan.FromMilliseconds(cfg.ReconnectDelayMs);
             var maxDelay = TimeSpan.FromMilliseconds(cfg.MaxReconnectDelayMs);
 
-            IExchangeDataSource Factory(IServiceProvider sp) => exchange switch
+            IExchangeDataSource Factory(IServiceProvider sp)
             {
-                Exchange.Binance => new BinanceWebSocketDataSource(uri, initialDelay, maxDelay,
-                    sp.GetRequiredService<ILoggerFactory>()),
-                Exchange.Bybit => new BybitWebSocketDataSource(uri, initialDelay, maxDelay,
-                    sp.GetRequiredService<ILoggerFactory>()),
-                Exchange.Kraken => new KrakenWebSocketDataSource(uri, initialDelay, maxDelay,
-                    sp.GetRequiredService<ILoggerFactory>()),
-                _ => throw new NotSupportedException($"Exchange {exchange} is not supported.")
-            };
+                var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                return exchange switch
+                {
+                    Exchange.Binance => new BinanceWebSocketDataSource(
+                        new ExchangeWebSocketClient(uri, initialDelay, maxDelay,
+                            loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.Binance")),
+                        new BinanceParser(),
+                        new BinanceMapper(),
+                        loggerFactory.CreateLogger<BinanceWebSocketDataSource>()),
+                    Exchange.Bybit => new BybitWebSocketDataSource(
+                        new ExchangeWebSocketClient(uri, initialDelay, maxDelay,
+                            loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.Bybit")),
+                        new BybitParser(),
+                        new BybitMapper(),
+                        loggerFactory.CreateLogger<BybitWebSocketDataSource>()),
+                    Exchange.Kraken => new KrakenWebSocketDataSource(
+                        new ExchangeWebSocketClient(uri, initialDelay, maxDelay,
+                            loggerFactory.CreateLogger($"{nameof(ExchangeWebSocketClient)}.Kraken")),
+                        new KrakenParser(),
+                        new KrakenMapper(),
+                        loggerFactory.CreateLogger<KrakenWebSocketDataSource>()),
+                    _ => throw new NotSupportedException($"Exchange {exchange} is not supported.")
+                };
+            }
 
             services.AddSingleton<IExchangeDataSource>(Factory);
         }

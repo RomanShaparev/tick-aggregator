@@ -7,7 +7,7 @@ using Polly.Retry;
 
 namespace TickAggregator.Infrastructure.WebSocket;
 
-public sealed class ExchangeWebSocketClient
+public sealed class ExchangeWebSocketClient : IExchangeWebSocketClient
 {
     private readonly Uri _uri;
     private readonly ResiliencePipeline _pipeline;

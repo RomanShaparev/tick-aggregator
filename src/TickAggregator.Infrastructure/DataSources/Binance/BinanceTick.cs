@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace TickAggregator.Infrastructure.DataSources.Binance;
 
-internal sealed record BinanceTick(
+public sealed record BinanceTick(
     [property: JsonPropertyName("t")] long TradeId,
     [property: JsonPropertyName("s")] string Symbol,
     [property: JsonPropertyName("p")] string Price,

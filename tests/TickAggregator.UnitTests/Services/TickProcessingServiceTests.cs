@@ -27,7 +27,7 @@ public sealed class TickProcessingServiceTests : IDisposable
     private TickProcessingService CreateService() =>
         new(new DeduplicationService(
                 new InMemoryCache(new MemoryCache(new MemoryCacheOptions())),
-                Options.Create(new DeduplicationOptions())),
+                Options.Create(new DeduplicationOptions { TtlSeconds = 300 })),
             _repository,
             _metrics,
             NullLogger<TickProcessingService>.Instance);

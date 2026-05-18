@@ -2,11 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
-internal sealed record KrakenMessage(
+public sealed record KrakenMessage(
     [property: JsonPropertyName("data")] KrakenTick[]? Data
 );
 
-internal sealed record KrakenTick(
+public sealed record KrakenTick(
     [property: JsonPropertyName("trade_id")] long TradeId,
     [property: JsonPropertyName("symbol")] string Symbol,
     [property: JsonPropertyName("price")] decimal Price,

@@ -3,9 +3,9 @@ using TickAggregator.Domain.Enums;
 
 namespace TickAggregator.Infrastructure.DataSources.Bybit;
 
-internal static class BybitMapper
+public sealed class BybitMapper : IMapper<BybitTick>
 {
-    internal static Tick ToTick(this BybitTick raw) => new()
+    public Tick Map(BybitTick raw) => new()
     {
         TradeId = raw.TradeId,
         Exchange = Exchange.Bybit,

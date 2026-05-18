@@ -2,11 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace TickAggregator.Infrastructure.DataSources.Bybit;
 
-internal sealed record BybitMessage(
+public sealed record BybitMessage(
     [property: JsonPropertyName("data")] BybitTick[]? Data
 );
 
-internal sealed record BybitTick(
+public sealed record BybitTick(
     [property: JsonPropertyName("i")] string TradeId,
     [property: JsonPropertyName("s")] string Symbol,
     [property: JsonPropertyName("p")] string Price,

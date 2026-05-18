@@ -3,9 +3,9 @@ using TickAggregator.Domain.Enums;
 
 namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
-internal static class KrakenMapper
+public sealed class KrakenMapper : IMapper<KrakenTick>
 {
-    internal static Tick ToTick(this KrakenTick raw) => new()
+    public Tick Map(KrakenTick raw) => new()
     {
         TradeId = raw.TradeId.ToString(),
         Exchange = Exchange.Kraken,
