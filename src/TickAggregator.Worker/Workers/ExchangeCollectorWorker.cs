@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Hosting;
 using TickAggregator.Application.Services;
 
 namespace TickAggregator.Worker.Workers;

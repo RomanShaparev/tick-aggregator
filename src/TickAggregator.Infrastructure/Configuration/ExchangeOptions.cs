@@ -4,10 +4,12 @@ namespace TickAggregator.Infrastructure.Configuration;
 
 public sealed class DataSourceConfig
 {
+    public const string Section = "DataSources";
+    
     [Required]
     public required string Name { get; init; }
 
-    [Required]
+    [Required, Url]
     public required string Url { get; init; }
 
     [Range(0, int.MaxValue)]

@@ -1,7 +1,5 @@
 using System.Net.WebSockets;
 using System.Text;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace TickAggregator.Simulator;
 

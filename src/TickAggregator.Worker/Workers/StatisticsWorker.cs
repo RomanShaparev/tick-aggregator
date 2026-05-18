@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using TickAggregator.Application.Metrics;
 
 namespace TickAggregator.Worker.Workers;

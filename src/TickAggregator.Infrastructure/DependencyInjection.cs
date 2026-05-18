@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -40,6 +40,41 @@ public static class DependencyInjection
         services.AddSingleton<IDlqProducer, DlqProducer>();
         services.AddSingleton<TickCollectorService>();
 
+        services.AddMassTransitServices();
+
+        return services;
+    }
+
+    private static IServiceCollection AddMassTransitServices(this IServiceCollection services)
+    {
+        services.AddMassTransit(x =>
+        {
+            x.AddConsumer<TickBatchConsumer>();
+
+            x.UsingRabbitMq((busCtx, cfg) =>
+            {
+                var mq = busCtx.GetRequiredService<IOptions<RabbitMqOptions>>().Value;
+
+                cfg.Host(mq.Host, mq.Port, mq.VirtualHost, h =>
+                {
+                    h.Username(mq.Username);
+                    h.Password(mq.Password);
+                });
+
+                cfg.ReceiveEndpoint(mq.QueueName, e =>
+                {
+                    e.Durable = true;
+                    e.AutoDelete = false;
+                    e.PrefetchCount = mq.PrefetchCount;
+                    e.ConfigureConsumer<TickBatchConsumer>(busCtx, c =>
+                        c.Options<BatchOptions>(o => o
+                            .SetMessageLimit(mq.BatchMessageLimit)
+                            .SetTimeLimit(TimeSpan.FromMilliseconds(mq.BatchTimeLimitMs))
+                            .SetConcurrencyLimit(1)));
+                });
+            });
+        });
+
         return services;
     }
 
@@ -48,17 +83,11 @@ public static class DependencyInjection
     {
         foreach (var cfg in configs)
         {
-            var results = new List<ValidationResult>();
-            if (!Validator.TryValidateObject(cfg, new ValidationContext(cfg), results, validateAllProperties: true))
-                throw new InvalidOperationException(
-                    $"Invalid DataSource '{cfg.Name}': {string.Join("; ", results.Select(r => r.ErrorMessage))}");
-
             var exchange = Enum.Parse<Exchange>(cfg.Name);
             var uri = new Uri(cfg.Url);
 
             if (uri.Scheme is not ("ws" or "wss"))
-                throw new NotSupportedException(
-                    $"Protocol '{uri.Scheme}' is not supported for exchange {exchange}.");
+                throw new NotSupportedException($"Protocol '{uri.Scheme}' is not supported for exchange {exchange}.");
 
             var initialDelay = TimeSpan.FromMilliseconds(cfg.ReconnectDelayMs);
             var maxDelay = TimeSpan.FromMilliseconds(cfg.MaxReconnectDelayMs);
