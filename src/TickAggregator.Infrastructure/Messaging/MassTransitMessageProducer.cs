@@ -1,4 +1,5 @@
 using MassTransit;
+using TickAggregator.Application.Interfaces;
 using TickAggregator.Domain.Entities;
 
 namespace TickAggregator.Infrastructure.Messaging;

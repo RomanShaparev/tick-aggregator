@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace TickAggregator.Infrastructure.Parsers.Kraken;
+namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
 internal sealed record KrakenMessage(
     [property: JsonPropertyName("data")] KrakenTick[]? Data

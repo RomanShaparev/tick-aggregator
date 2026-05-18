@@ -1,6 +1,6 @@
 using TickAggregator.Domain.Entities;
 
-namespace TickAggregator.Infrastructure.Messaging;
+namespace TickAggregator.Application.Interfaces;
 
 public interface IMessageProducer
 {

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace TickAggregator.Infrastructure.Parsers.Binance;
+namespace TickAggregator.Infrastructure.DataSources.Binance;
 
 internal sealed record BinanceTick(
     [property: JsonPropertyName("t")] long TradeId,

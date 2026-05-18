@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace TickAggregator.Infrastructure.Parsers.Bybit;
+namespace TickAggregator.Infrastructure.DataSources.Bybit;
 
 internal sealed record BybitMessage(
     [property: JsonPropertyName("data")] BybitTick[]? Data

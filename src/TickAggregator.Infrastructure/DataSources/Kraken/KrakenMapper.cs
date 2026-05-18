@@ -1,14 +1,14 @@
 using TickAggregator.Domain.Entities;
 using TickAggregator.Domain.Enums;
 
-namespace TickAggregator.Infrastructure.Parsers.Kraken;
+namespace TickAggregator.Infrastructure.DataSources.Kraken;
 
 internal static class KrakenMapper
 {
-    internal static Tick ToTick(this KrakenTick raw, Exchange exchange) => new()
+    internal static Tick ToTick(this KrakenTick raw) => new()
     {
         TradeId = raw.TradeId.ToString(),
-        Exchange = exchange,
+        Exchange = Exchange.Kraken,
         Ticker = raw.Symbol.Replace("/", ""),
         Price = raw.Price,
         Volume = raw.Qty,

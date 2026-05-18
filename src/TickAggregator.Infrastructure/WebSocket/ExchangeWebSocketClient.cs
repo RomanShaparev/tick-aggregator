@@ -1,92 +1,124 @@
 using System.Net.WebSockets;
 using System.Text;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 
 namespace TickAggregator.Infrastructure.WebSocket;
 
 public sealed class ExchangeWebSocketClient : IAsyncDisposable
 {
-    private ClientWebSocket _ws = new();
-    private readonly ILogger<ExchangeWebSocketClient> _logger;
-    private readonly string _exchangeName;
     private readonly Uri _uri;
+    private readonly ResiliencePipeline _pipeline;
+    private readonly ILogger _logger;
+    private const int ReceiveBufferSize = 16384;
+    private Task _producerTask = Task.CompletedTask;
 
-    public string ExchangeName => _exchangeName;
-
-    public ExchangeWebSocketClient(string exchangeName, Uri uri, ILogger<ExchangeWebSocketClient> logger)
+    public ExchangeWebSocketClient(
+        Uri uri,
+        TimeSpan initialDelay,
+        TimeSpan maxDelay,
+        ILogger logger)
     {
-        _exchangeName = exchangeName;
         _uri = uri;
         _logger = logger;
+        _pipeline = new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                MaxRetryAttempts = int.MaxValue,
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true,
+                Delay = initialDelay,
+                MaxDelay = maxDelay,
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(ex => ex is not OperationCanceledException),
+                OnRetry = args =>
+                {
+                    _logger.LogWarning("Reconnecting to {Uri} in {Delay}s (attempt #{Attempt})",
+                        _uri, args.RetryDelay.TotalSeconds.ToString("F1"), args.AttemptNumber + 1);
+                    return ValueTask.CompletedTask;
+                }
+            })
+            .Build();
     }
 
-    public async Task ConnectAsync(CancellationToken ct)
+    public IAsyncEnumerable<string> StreamAsync(CancellationToken ct)
     {
-        _logger.LogInformation("Connecting to {Exchange} WebSocket at {Uri}", _exchangeName, _uri);
-        await _ws.ConnectAsync(_uri, ct);
-        _logger.LogInformation("Connected to {Exchange}", _exchangeName);
+        var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+        _producerTask = ProduceAsync(channel.Writer, ct);
+        return channel.Reader.ReadAllAsync(ct);
     }
 
-    public async IAsyncEnumerable<string> ReceiveMessagesAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    private async Task ProduceAsync(ChannelWriter<string> writer, CancellationToken ct)
     {
-        var buffer = new byte[16384];
-        var messageBuffer = new StringBuilder();
+        try
+        {
+            await _pipeline.ExecuteAsync(async innerCt =>
+            {
+                using var ws = new ClientWebSocket();
 
-        while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
+                _logger.LogInformation("Connecting to {Uri}", _uri);
+                await ws.ConnectAsync(_uri, innerCt);
+                _logger.LogInformation("Connected to {Uri}", _uri);
+
+                await foreach (var msg in ReceiveAsync(ws, innerCt))
+                    await writer.WriteAsync(msg, innerCt);
+            }, ct);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Streaming from {Uri} failed permanently", _uri);
+        }
+        finally
+        {
+            writer.Complete();
+        }
+    }
+
+    private async IAsyncEnumerable<string> ReceiveAsync(
+        ClientWebSocket ws,
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+        CancellationToken ct)
+    {
+        var buffer = new byte[ReceiveBufferSize];
+        var sb = new StringBuilder();
+
+        while (!ct.IsCancellationRequested)
         {
             WebSocketReceiveResult result;
             try
             {
-                result = await _ws.ReceiveAsync(buffer, ct);
+                result = await ws.ReceiveAsync(buffer, ct);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
-                _logger.LogError(ex, "WebSocket receive error from {Exchange}", _exchangeName);
-                yield break;
+                _logger.LogError(ex, "Receive error from {Uri}", _uri);
+                throw;
             }
 
             if (result.MessageType == WebSocketMessageType.Close)
             {
-                _logger.LogWarning("WebSocket closed by server for {Exchange}", _exchangeName);
-                yield break;
+                _logger.LogWarning("WebSocket closed by {Uri}", _uri);
+                throw new WebSocketException(WebSocketError.ConnectionClosedPrematurely, "Server closed connection");
             }
 
-            messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
 
             if (result.EndOfMessage)
             {
-                var message = messageBuffer.ToString();
-                messageBuffer.Clear();
+                var message = sb.ToString();
+                sb.Clear();
                 if (!string.IsNullOrWhiteSpace(message))
                     yield return message;
             }
         }
     }
 
-    public bool IsConnected => _ws.State == WebSocketState.Open;
-
-    public async Task DisconnectAsync()
-    {
-        if (_ws.State == WebSocketState.Open)
-        {
-            try
-            {
-                await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-            }
-            catch { /* ignore */ }
-        }
-        _logger.LogInformation("Disconnected from {Exchange}", _exchangeName);
-    }
-
-    public void Reconnect()
-    {
-        _ws.Dispose();
-        _ws = new ClientWebSocket();
-    }
-
     public async ValueTask DisposeAsync()
     {
-        await DisconnectAsync();
-        _ws.Dispose();
+        await _producerTask;
     }
 }

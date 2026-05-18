@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TickAggregator.Application.Interfaces;
 using TickAggregator.Application.Metrics;
 using TickAggregator.Application.Services;
 using TickAggregator.Domain.Enums;
@@ -10,12 +11,11 @@ using TickAggregator.Domain.Interfaces;
 using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.DataSources;
 using TickAggregator.Infrastructure.Database;
+using TickAggregator.Infrastructure.DataSources.Binance;
+using TickAggregator.Infrastructure.DataSources.Bybit;
+using TickAggregator.Infrastructure.DataSources.Kraken;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
-using TickAggregator.Infrastructure.Parsers;
-using TickAggregator.Infrastructure.Parsers.Binance;
-using TickAggregator.Infrastructure.Parsers.Bybit;
-using TickAggregator.Infrastructure.Parsers.Kraken;
 
 namespace TickAggregator.Infrastructure.Extensions;
 
@@ -30,14 +30,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDeduplicationService, InMemoryDeduplicationService>();
         services.AddSingleton<TickMetrics>();
 
-        services.AddSingleton<IExchangeParser, BinanceParser>();
-        services.AddSingleton<IExchangeParser, KrakenParser>();
-        services.AddSingleton<IExchangeParser, BybitParser>();
-        services.AddSingleton<ExchangeParserService>();
-
         services.AddScoped<TickProcessingService>();
 
         services.AddSingleton<IMessageProducer, MassTransitMessageProducer>();
+        services.AddSingleton<TickCollectorService>();
 
         return services;
     }
@@ -55,17 +51,25 @@ public static class ServiceCollectionExtensions
             var exchange = Enum.Parse<Exchange>(cfg.Name);
             var uri = new Uri(cfg.Url);
 
-            switch (uri.Scheme)
+            if (uri.Scheme is not ("ws" or "wss"))
+                throw new NotSupportedException(
+                    $"Protocol '{uri.Scheme}' is not supported for exchange {exchange}.");
+
+            var initialDelay = TimeSpan.FromMilliseconds(cfg.ReconnectDelayMs);
+            var maxDelay = TimeSpan.FromMilliseconds(cfg.MaxReconnectDelayMs);
+
+            IExchangeDataSource Factory(IServiceProvider sp) => exchange switch
             {
-                case "ws" or "wss":
-                    services.AddSingleton<IExchangeDataSource>(sp => new WebSocketExchangeDataSource(
-                        exchange, uri, cfg.ReconnectDelayMs, cfg.MaxReconnectDelayMs,
-                        sp.GetRequiredService<ILoggerFactory>()));
-                    break;
-                default:
-                    throw new NotSupportedException(
-                        $"Protocol '{uri.Scheme}' is not supported for exchange {exchange}.");
-            }
+                Exchange.Binance => new BinanceWebSocketDataSource(uri, initialDelay, maxDelay,
+                    sp.GetRequiredService<ILoggerFactory>()),
+                Exchange.Bybit => new BybitWebSocketDataSource(uri, initialDelay, maxDelay,
+                    sp.GetRequiredService<ILoggerFactory>()),
+                Exchange.Kraken => new KrakenWebSocketDataSource(uri, initialDelay, maxDelay,
+                    sp.GetRequiredService<ILoggerFactory>()),
+                _ => throw new NotSupportedException($"Exchange {exchange} is not supported.")
+            };
+
+            services.AddSingleton<IExchangeDataSource>(Factory);
         }
 
         return services;
