@@ -10,6 +10,8 @@ using TickAggregator.Domain.Enums;
 using TickAggregator.Domain.Interfaces;
 using TickAggregator.Infrastructure.Database;
 using TickAggregator.Infrastructure.Caching;
+using Microsoft.Extensions.Options;
+using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Infrastructure.Deduplication;
 using TickAggregator.Infrastructure.Messaging;
 using TickAggregator.IntegrationTests.Infrastructure;
@@ -44,14 +46,15 @@ public sealed class FullPipelineTests : IAsyncLifetime
     {
         var services = new ServiceCollection()
             .AddLogging(b => b.SetMinimumLevel(LogLevel.Warning))
-            .AddDbContextFactory<AppDbContext>(options =>
+            .AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(_postgres.ConnectionString))
-            .AddSingleton<ITickRepository, TickRepository>()
+            .AddScoped<ITickRepository, TickRepository>()
             .AddMemoryCache()
             .AddSingleton<ICache, InMemoryCache>()
+            .AddSingleton(Options.Create(new DeduplicationOptions { TtlSeconds = 300 }))
             .AddSingleton<IDeduplicationService, DeduplicationService>()
             .AddSingleton<TickMetrics>()
-            .AddSingleton<TickProcessingService>();
+            .AddScoped<TickProcessingService>();
 
         services.AddMassTransit(x =>
         {

@@ -94,13 +94,19 @@ public sealed class BybitWebSocketDataSourceTests
     }
 
     [Fact]
-    public async Task InvalidJson_YieldsNothing()
+    public async Task InvalidJson_YieldsNothing_AndSendsToDlq()
     {
+        var dlq = Substitute.For<IDlqProducer>();
         var client = Substitute.For<IExchangeWebSocketClient>();
         client.StreamAsync(Arg.Any<CancellationToken>()).Returns(Payloads(["not-json"]));
+        var source = new ExchangeWebSocketDataSource<BybitTick>(
+            client, new BybitTickParser(), new BybitTickMapper(), dlq, Exchange.Bybit, NullLogger.Instance);
 
-        var ticks = await CreateSource(client).StreamAsync(default).ToListAsync();
+        var ticks = await source.StreamAsync(default).ToListAsync();
 
         ticks.Should().BeEmpty();
+        await dlq.Received(1).SendAsync(
+            Arg.Is<InvalidMessage>(m => m.Exchange == Exchange.Bybit && m.RawPayload == "not-json"),
+            Arg.Any<CancellationToken>());
     }
 }

@@ -93,6 +93,34 @@ public sealed class TickProcessingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessBatch_MetricsTaggedWithExchange()
+    {
+        var captured = new List<(long Value, string? Exchange)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == TickMetrics.MeterName)
+                l.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+        {
+            var exchange = tags.ToArray()
+                .FirstOrDefault(t => t.Key == "exchange")
+                .Value?.ToString();
+            captured.Add((value, exchange));
+        });
+        listener.Start();
+
+        await CreateService().ProcessBatchAsync(
+            [MakeTick("1", Exchange.Binance), MakeTick("2", Exchange.Kraken)],
+            CancellationToken.None);
+
+        captured.Should().HaveCount(2);
+        captured.Should().Contain(x => x.Exchange == "Binance");
+        captured.Should().Contain(x => x.Exchange == "Kraken");
+    }
+
+    [Fact]
     public async Task ProcessBatch_RepositoryThrows_ExceptionPropagates()
     {
         _repository.InsertBatchAsync(Arg.Any<IReadOnlyList<Tick>>(), Arg.Any<CancellationToken>())

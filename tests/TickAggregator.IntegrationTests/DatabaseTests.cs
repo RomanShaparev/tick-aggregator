@@ -76,4 +76,62 @@ public sealed class DatabaseTests : IAsyncLifetime
         var count = await _fixture.CountTicksAsync();
         count.Should().Be(0);
     }
+
+    [Fact]
+    public async Task InsertBatch_DuplicatePrimaryKey_IgnoresConflict()
+    {
+        await _fixture.ClearTicksAsync();
+        var repo = CreateRepository();
+        var tick = new Tick
+        {
+            TradeId = "dup-001",
+            Exchange = Exchange.Binance,
+            Ticker = "BTCUSDT",
+            Price = 50000m,
+            Volume = 0.001m,
+            Timestamp = DateTimeOffset.UtcNow,
+        };
+
+        await repo.InsertBatchAsync([tick], CancellationToken.None);
+        var act = async () => await repo.InsertBatchAsync([tick], CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        var count = await _fixture.CountTicksAsync();
+        count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task InsertBatch_SameTradeIdDifferentExchanges_BothPersisted()
+    {
+        await _fixture.ClearTicksAsync();
+        var repo = CreateRepository();
+        var ticks = new[]
+        {
+            new Tick { TradeId = "shared-id", Exchange = Exchange.Binance, Ticker = "BTCUSDT", Price = 50000m, Volume = 0.001m, Timestamp = DateTimeOffset.UtcNow },
+            new Tick { TradeId = "shared-id", Exchange = Exchange.Kraken, Ticker = "BTCUSD",  Price = 50001m, Volume = 0.002m, Timestamp = DateTimeOffset.UtcNow },
+        };
+
+        await repo.InsertBatchAsync(ticks, CancellationToken.None);
+
+        var count = await _fixture.CountTicksAsync();
+        count.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task InsertBatch_MultipleExchanges_AllPersisted()
+    {
+        await _fixture.ClearTicksAsync();
+        var repo = CreateRepository();
+        var ticks = new[]
+        {
+            new Tick { TradeId = "x-1", Exchange = Exchange.Binance, Ticker = "BTCUSDT", Price = 50000m, Volume = 0.1m, Timestamp = DateTimeOffset.UtcNow },
+            new Tick { TradeId = "x-2", Exchange = Exchange.Kraken,  Ticker = "BTCUSD",  Price = 50001m, Volume = 0.2m, Timestamp = DateTimeOffset.UtcNow },
+            new Tick { TradeId = "x-3", Exchange = Exchange.Bybit,   Ticker = "BTCUSDT", Price = 49999m, Volume = 0.3m, Timestamp = DateTimeOffset.UtcNow },
+        };
+
+        await repo.InsertBatchAsync(ticks, CancellationToken.None);
+
+        var count = await _fixture.CountTicksAsync();
+        count.Should().Be(3);
+    }
 }
