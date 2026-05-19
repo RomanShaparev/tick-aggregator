@@ -7,7 +7,7 @@ using Xunit;
 
 namespace TickAggregator.EndToEndTests.Infrastructure;
 
-public sealed class PostgresFixture : IAsyncLifetime
+public sealed class PostgresFixture
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
@@ -18,7 +18,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public async Task InitializeAsync()
+    public async Task StartAsync()
     {
         await _container.StartAsync();
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -28,7 +28,10 @@ public sealed class PostgresFixture : IAsyncLifetime
         await context.Database.MigrateAsync();
     }
 
-    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+    public async Task DisposeAsync()
+    {
+        await _container.DisposeAsync();
+    }
 
     public async Task<int> CountTicksAsync()
     {

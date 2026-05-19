@@ -18,10 +18,7 @@ public static class HostBuilderFactory
 
                 services.AddInfrastructure();
 
-                var dataSources = ctx.Configuration.GetValidatedOptions<List<DataSourceConfig>>(DataSourceConfig.Section);
-                if (dataSources == null || dataSources.Count == 0)
-                    throw new Exception($"{DataSourceConfig.Section} is empty.");
-
+                var dataSources = ctx.Configuration.GetValidatedOptions<List<DataSourceConfig>>(DataSourceConfig.Section) ?? [];
                 services.AddDataSources(dataSources);
 
                 services.AddHostedService<ExchangeCollectorWorker>();

@@ -16,12 +16,11 @@ public sealed class ProgramHostTests : IAsyncLifetime
 {
     private readonly RabbitMqFixture _rabbitMq = new();
     private readonly PostgresFixture _postgres = new();
-    private readonly string _queueSuffix = Guid.NewGuid().ToString("N");
     private IHost? _host;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_rabbitMq.InitializeAsync(), _postgres.InitializeAsync());
+        await Task.WhenAll(_rabbitMq.StartAsync(), _postgres.StartAsync());
     }
 
     public async Task DisposeAsync()
@@ -41,15 +40,12 @@ public sealed class ProgramHostTests : IAsyncLifetime
         {
             ["RabbitMq:Host"] = _rabbitMq.Hostname,
             ["RabbitMq:Port"] = _rabbitMq.Port.ToString(),
-            ["RabbitMq:VirtualHost"] = "/",
             ["RabbitMq:Username"] = _rabbitMq.Username,
             ["RabbitMq:Password"] = _rabbitMq.Password,
-            ["RabbitMq:QueueName"] = $"raw-ticks-e2e-{_queueSuffix}",
             ["RabbitMq:BatchMessageLimit"] = "1",
             ["RabbitMq:BatchTimeLimitMs"] = "100",
             ["RabbitMq:PrefetchCount"] = "10",
             ["Database:ConnectionString"] = _postgres.ConnectionString,
-            ["Deduplication:TtlSeconds"] = "5",
         };
 
         return HostBuilderFactory.Create([])
@@ -82,7 +78,7 @@ public sealed class ProgramHostTests : IAsyncLifetime
         return count;
     }
 
-    private static Tick MakeTick(string tradeId, Exchange exchange = Exchange.Binance) => new()
+    private Tick MakeTick(string tradeId, Exchange exchange = Exchange.Binance) => new()
     {
         TradeId = tradeId,
         Exchange = exchange,
@@ -96,8 +92,8 @@ public sealed class ProgramHostTests : IAsyncLifetime
     public async Task Host_SingleTick_SavedToDatabase()
     {
         await StartHostAsync([MakeTick("e2e-1")]);
-
-        var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(30));
+    
+        var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(5));
         count.Should().Be(1);
     }
 
@@ -107,7 +103,7 @@ public sealed class ProgramHostTests : IAsyncLifetime
         var tick = MakeTick("e2e-dup");
         await StartHostAsync([tick, tick]);
 
-        var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(30));
+        var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(5));
         count.Should().Be(1);
     }
 
@@ -120,7 +116,7 @@ public sealed class ProgramHostTests : IAsyncLifetime
             MakeTick("e2e-bby", Exchange.Bybit),
         ]);
 
-        var count = await WaitForCountAsync(3, TimeSpan.FromSeconds(30));
+        var count = await WaitForCountAsync(3, TimeSpan.FromSeconds(5));
         count.Should().Be(3);
     }
 }

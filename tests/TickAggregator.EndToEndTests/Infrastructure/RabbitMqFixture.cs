@@ -3,7 +3,7 @@ using Xunit;
 
 namespace TickAggregator.EndToEndTests.Infrastructure;
 
-public sealed class RabbitMqFixture : IAsyncLifetime
+public sealed class RabbitMqFixture
 {
     private readonly RabbitMqContainer _container = new RabbitMqBuilder()
         .WithImage("rabbitmq:3-alpine")
@@ -12,10 +12,17 @@ public sealed class RabbitMqFixture : IAsyncLifetime
         .Build();
 
     public string Hostname => _container.Hostname;
-    public ushort Port => (ushort)_container.GetMappedPublicPort(5672);
+    public ushort Port => _container.GetMappedPublicPort(5672);
     public string Username => "guest";
     public string Password => "guest";
 
-    public Task InitializeAsync() => _container.StartAsync();
-    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+    public async Task StartAsync()
+    {
+        await _container.StartAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _container.DisposeAsync();
+    }
 }
