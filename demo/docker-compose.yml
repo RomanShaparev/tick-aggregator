@@ -55,7 +55,13 @@ services:
       context: ../
       dockerfile: src/TickAggregator.Worker/Dockerfile
     environment:
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.EntityFrameworkCore: Warning
+      Logging__LogLevel__Npgsql: Warning
       RabbitMq__Host: rabbitmq
+      RabbitMq__VirtualHost: /
+      RabbitMq__Username: guest
+      RabbitMq__Password: guest
       Database__ConnectionString: "Host=postgres;Port=5432;Database=tickaggregator;Username=postgres;Password=postgres"
       DataSources__0__Name: Binance
       DataSources__0__Url: ws://simulator-binance:5100/ws/binance
