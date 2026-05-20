@@ -38,4 +38,10 @@ public sealed class PostgresFixture
         await using var conn = new NpgsqlConnection(ConnectionString);
         return await conn.QuerySingleAsync<int>("SELECT COUNT(*) FROM ticks");
     }
+
+    public async Task ClearTicksAsync()
+    {
+        await using var conn = new NpgsqlConnection(ConnectionString);
+        await conn.ExecuteAsync("DELETE FROM ticks");
+    }
 }

@@ -1,27 +1,21 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using TickAggregator.Domain.Entities;
-using TickAggregator.Domain.Enums;
-using TickAggregator.Domain.Interfaces;
 using TickAggregator.EndToEndTests.Infrastructure;
 using TickAggregator.Worker;
 using Xunit;
 
 namespace TickAggregator.EndToEndTests;
 
-public sealed class ProgramHostTests : IAsyncLifetime
+public sealed class ProgramHostTests : IClassFixture<TestEnvironmentFixture>, IAsyncLifetime
 {
-    private readonly RabbitMqFixture _rabbitMq = new();
-    private readonly PostgresFixture _postgres = new();
+    private readonly TestEnvironmentFixture _env;
     private IHost? _host;
+    private readonly List<IAsyncDisposable> _servers = [];
 
-    public async Task InitializeAsync()
-    {
-        await Task.WhenAll(_rabbitMq.StartAsync(), _postgres.StartAsync());
-    }
+    public ProgramHostTests(TestEnvironmentFixture env) => _env = env;
+
+    public Task InitializeAsync() => _env.ClearTicksAsync();
 
     public async Task DisposeAsync()
     {
@@ -30,37 +24,46 @@ public sealed class ProgramHostTests : IAsyncLifetime
             await _host.StopAsync(TimeSpan.FromSeconds(5));
             _host.Dispose();
         }
-        await _postgres.DisposeAsync();
-        await _rabbitMq.DisposeAsync();
+        foreach (var server in _servers)
+            await server.DisposeAsync();
     }
 
-    private IHost BuildHost(IReadOnlyList<Tick> ticks)
+    private async Task<ExchangeWebSocketServerFixture> CreateServerAsync(IReadOnlyList<string> messages)
+    {
+        var server = new ExchangeWebSocketServerFixture(messages);
+        await server.StartAsync();
+        _servers.Add(server);
+        return server;
+    }
+
+    private IHost BuildHost(params (string exchange, Uri url)[] sources)
     {
         var config = new Dictionary<string, string?>
         {
-            ["RabbitMq:Host"] = _rabbitMq.Hostname,
-            ["RabbitMq:Port"] = _rabbitMq.Port.ToString(),
-            ["RabbitMq:Username"] = _rabbitMq.Username,
-            ["RabbitMq:Password"] = _rabbitMq.Password,
+            ["RabbitMq:Host"] = _env.RabbitMqHostname,
+            ["RabbitMq:Port"] = _env.RabbitMqPort.ToString(),
+            ["RabbitMq:Username"] = _env.RabbitMqUsername,
+            ["RabbitMq:Password"] = _env.RabbitMqPassword,
             ["RabbitMq:BatchMessageLimit"] = "1",
             ["RabbitMq:BatchTimeLimitMs"] = "100",
             ["RabbitMq:PrefetchCount"] = "10",
-            ["Database:ConnectionString"] = _postgres.ConnectionString,
+            ["Database:ConnectionString"] = _env.PostgresConnectionString,
         };
+
+        for (var i = 0; i < sources.Length; i++)
+        {
+            config[$"DataSources:{i}:Name"] = sources[i].exchange;
+            config[$"DataSources:{i}:Url"] = sources[i].url.ToString();
+        }
 
         return HostBuilderFactory.Create([])
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(config))
-            .ConfigureServices(services =>
-            {
-                services.RemoveAll<IExchangeDataSource>();
-                services.AddSingleton<IExchangeDataSource>(new FakeExchangeDataSource(ticks));
-            })
             .Build();
     }
 
-    private async Task StartHostAsync(IReadOnlyList<Tick> ticks)
+    private async Task StartHostAsync(params (string exchange, Uri url)[] sources)
     {
-        _host = BuildHost(ticks);
+        _host = BuildHost(sources);
         await _host.StartAsync();
     }
 
@@ -70,7 +73,7 @@ public sealed class ProgramHostTests : IAsyncLifetime
         int count;
         do
         {
-            count = await _postgres.CountTicksAsync();
+            count = await _env.CountTicksAsync();
             if (count >= expected) return count;
             await Task.Delay(150);
         }
@@ -78,45 +81,39 @@ public sealed class ProgramHostTests : IAsyncLifetime
         return count;
     }
 
-    private Tick MakeTick(string tradeId, Exchange exchange = Exchange.Binance) => new()
-    {
-        TradeId = tradeId,
-        Exchange = exchange,
-        Ticker = "BTCUSDT",
-        Price = 50000m,
-        Volume = 0.001m,
-        Timestamp = DateTimeOffset.UtcNow,
-    };
-
     [Fact]
     public async Task Host_SingleTick_SavedToDatabase()
     {
-        await StartHostAsync([MakeTick("e2e-1")]);
-    
-        var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(5));
-        count.Should().Be(1);
+        var binance = await CreateServerAsync([ExchangeWebSocketServerFixture.Binance(1)]);
+
+        await StartHostAsync(("Binance", binance.Uri));
+
+        (await WaitForCountAsync(1, TimeSpan.FromSeconds(5))).Should().Be(1);
     }
 
     [Fact]
     public async Task Host_DuplicateTick_SavedOnlyOnce()
     {
-        var tick = MakeTick("e2e-dup");
-        await StartHostAsync([tick, tick]);
+        var msg = ExchangeWebSocketServerFixture.Binance(1);
+        var binance = await CreateServerAsync([msg, msg]);
 
-        var count = await WaitForCountAsync(1, TimeSpan.FromSeconds(5));
-        count.Should().Be(1);
+        await StartHostAsync(("Binance", binance.Uri));
+
+        (await WaitForCountAsync(1, TimeSpan.FromSeconds(5))).Should().Be(1);
     }
 
     [Fact]
     public async Task Host_MultipleExchanges_AllSaved()
     {
-        await StartHostAsync([
-            MakeTick("e2e-bin", Exchange.Binance),
-            MakeTick("e2e-kra", Exchange.Kraken),
-            MakeTick("e2e-bby", Exchange.Bybit),
-        ]);
+        var binance = await CreateServerAsync([ExchangeWebSocketServerFixture.Binance(1)]);
+        var bybit   = await CreateServerAsync([ExchangeWebSocketServerFixture.Bybit("1")]);
+        var kraken  = await CreateServerAsync([ExchangeWebSocketServerFixture.Kraken(1)]);
 
-        var count = await WaitForCountAsync(3, TimeSpan.FromSeconds(5));
-        count.Should().Be(3);
+        await StartHostAsync(
+            ("Binance", binance.Uri),
+            ("Bybit",   bybit.Uri),
+            ("Kraken",  kraken.Uri));
+
+        (await WaitForCountAsync(3, TimeSpan.FromSeconds(5))).Should().Be(3);
     }
 }
