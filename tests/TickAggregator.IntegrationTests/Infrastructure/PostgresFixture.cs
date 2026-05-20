@@ -1,6 +1,4 @@
-using Dapper;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Testcontainers.PostgreSql;
 using TickAggregator.Infrastructure.Database;
 using Xunit;
@@ -11,9 +9,6 @@ public sealed class PostgresFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
-        .WithDatabase("tickaggregator_test")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();
@@ -21,10 +16,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
-        await using var context = new AppDbContext(options);
+        await using var context = CreateContext();
         await context.Database.MigrateAsync();
     }
 
@@ -32,13 +24,21 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public async Task<int> CountTicksAsync()
     {
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        return await conn.QuerySingleAsync<int>("SELECT COUNT(*) FROM ticks");
+        await using var context = CreateContext();
+        return await context.Ticks.CountAsync();
     }
 
     public async Task ClearTicksAsync()
     {
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        await conn.ExecuteAsync("TRUNCATE TABLE ticks");
+        await using var context = CreateContext();
+        await context.Ticks.ExecuteDeleteAsync();
+    }
+
+    private AppDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(ConnectionString)
+            .Options;
+        return new AppDbContext(options);
     }
 }

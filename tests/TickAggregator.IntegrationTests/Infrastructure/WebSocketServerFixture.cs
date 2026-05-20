@@ -10,7 +10,7 @@ using Xunit;
 
 namespace TickAggregator.IntegrationTests.Infrastructure;
 
-public sealed class WebSocketServerFixture : IAsyncLifetime
+public sealed class WebSocketServerFixture
 {
     private readonly WebApplication _app;
     private readonly ConcurrentQueue<Func<WebSocket, CancellationToken, Task>> _handlers = new();

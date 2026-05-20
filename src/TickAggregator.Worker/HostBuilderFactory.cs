@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using TickAggregator.Infrastructure;
 using TickAggregator.Infrastructure.Configuration;
 using TickAggregator.Worker.Extensions;

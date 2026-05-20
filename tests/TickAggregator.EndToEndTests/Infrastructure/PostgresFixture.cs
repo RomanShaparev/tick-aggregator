@@ -1,9 +1,7 @@
-using Dapper;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Testcontainers.PostgreSql;
+using TickAggregator.Domain.Entities;
 using TickAggregator.Infrastructure.Database;
-using Xunit;
 
 namespace TickAggregator.EndToEndTests.Infrastructure;
 
@@ -11,9 +9,6 @@ public sealed class PostgresFixture
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
-        .WithDatabase("tickaggregator_test")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();
@@ -21,10 +16,7 @@ public sealed class PostgresFixture
     public async Task StartAsync()
     {
         await _container.StartAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(ConnectionString)
-            .Options;
-        await using var context = new AppDbContext(options);
+        await using var context = CreateContext();
         await context.Database.MigrateAsync();
     }
 
@@ -35,13 +27,31 @@ public sealed class PostgresFixture
 
     public async Task<int> CountTicksAsync()
     {
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        return await conn.QuerySingleAsync<int>("SELECT COUNT(*) FROM ticks");
+        await using var context = CreateContext();
+        return await context.Ticks.CountAsync();
+    }
+
+    public async Task<IReadOnlyList<Tick>> GetTicksAsync()
+    {
+        await using var context = CreateContext();
+        return await context.Ticks
+            .AsNoTracking()
+            .OrderBy(t => t.Exchange)
+            .ThenBy(t => t.TradeId)
+            .ToListAsync();
     }
 
     public async Task ClearTicksAsync()
     {
-        await using var conn = new NpgsqlConnection(ConnectionString);
-        await conn.ExecuteAsync("DELETE FROM ticks");
+        await using var context = CreateContext();
+        await context.Ticks.ExecuteDeleteAsync();
+    }
+
+    private AppDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(ConnectionString)
+            .Options;
+        return new AppDbContext(options);
     }
 }

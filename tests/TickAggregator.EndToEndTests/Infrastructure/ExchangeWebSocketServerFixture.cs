@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using TickAggregator.Domain.Entities;
+using TickAggregator.Domain.Enums;
 using TickAggregator.Infrastructure.DataSources.Binance;
 using TickAggregator.Infrastructure.DataSources.Bybit;
 using TickAggregator.Infrastructure.DataSources.Kraken;
@@ -19,8 +22,10 @@ public sealed class ExchangeWebSocketServerFixture : IAsyncDisposable
 
     public Uri Uri { get; private set; } = null!;
 
-    public ExchangeWebSocketServerFixture(IReadOnlyList<string> messages)
+    public ExchangeWebSocketServerFixture(IReadOnlyList<Tick> ticks)
     {
+        var messages = ticks.Select(Serialize).ToList();
+
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
@@ -49,20 +54,32 @@ public sealed class ExchangeWebSocketServerFixture : IAsyncDisposable
 
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
 
-    public static string Binance(long tradeId, string symbol = "BTCUSDT", string price = "50000", string qty = "0.001")
-        => JsonSerializer.Serialize(new BinanceTick(tradeId, symbol, price, qty,
-            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
-
-    public static string Bybit(string tradeId, string symbol = "BTCUSDT", string price = "50000",
-        string volume = "0.001")
-        => JsonSerializer.Serialize(new BybitMessage([
-            new BybitTick(tradeId, symbol, price, volume, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-        ]));
-
-    public static string Kraken(long tradeId, string symbol = "BTC/USD", decimal price = 50000m, decimal qty = 0.001m)
-        => JsonSerializer.Serialize(new KrakenMessage([
-            new KrakenTick(tradeId, symbol, price, qty, DateTimeOffset.UtcNow)
-        ]));
+    private static string Serialize(Tick tick) => tick.Exchange switch
+    {
+        Exchange.Binance => JsonSerializer.Serialize(new BinanceTick(
+            long.Parse(tick.TradeId, CultureInfo.InvariantCulture),
+            tick.Ticker,
+            tick.Price.ToString(CultureInfo.InvariantCulture),
+            tick.Volume.ToString(CultureInfo.InvariantCulture),
+            tick.Timestamp.ToUnixTimeMilliseconds())),
+        Exchange.Bybit => JsonSerializer.Serialize(new BybitMessage([
+            new BybitTick(
+                tick.TradeId,
+                tick.Ticker,
+                tick.Price.ToString(CultureInfo.InvariantCulture),
+                tick.Volume.ToString(CultureInfo.InvariantCulture),
+                tick.Timestamp.ToUnixTimeMilliseconds())
+        ])),
+        Exchange.Kraken => JsonSerializer.Serialize(new KrakenMessage([
+            new KrakenTick(
+                long.Parse(tick.TradeId, CultureInfo.InvariantCulture),
+                tick.Ticker,
+                tick.Price,
+                tick.Volume,
+                tick.Timestamp)
+        ])),
+        _ => throw new ArgumentOutOfRangeException(nameof(tick), tick.Exchange, "Unsupported exchange."),
+    };
 
     private static async Task SendMessagesAsync(WebSocket ws, IReadOnlyList<string> messages, CancellationToken ct)
     {
